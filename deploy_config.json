@@ -1,0 +1,45 @@
+{
+    "deployment_method": "git",
+    "git": {
+        "remote": "origin",
+        "branch": "main",
+        "auto_push": true
+    },
+    "ssh": {
+        "host": "YOUR_SERVER_IP_OR_DOMAIN",
+        "port": 22,
+        "username": "deploy",
+        "key_file": "",
+        "remote_path": "/var/www/reelsense"
+    },
+    "ftp": {
+        "host": "ftp.your-server.com",
+        "port": 21,
+        "username": "ftpuser",
+        "password": "",
+        "remote_path": "/public_html",
+        "use_tls": true
+    },
+    "local": {
+        "target_path": ""
+    },
+    "exclude_patterns": [
+        "__pycache__",
+        "*.pyc",
+        ".git",
+        ".env",
+        "node_modules",
+        "*.log",
+        "releases",
+        "backups",
+        "outputs/videos/*",
+        "service_account.json"
+    ],
+    "include_env_template": true,
+    "max_releases": 5,
+    "pre_deploy_commands": [],
+    "post_deploy_commands": [
+        "pip install -r requirements.txt"
+    ],
+    "restart_command": ""
+}

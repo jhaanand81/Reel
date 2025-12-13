@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ReelSense AI - My Videos">
+    <title>My Videos - ReelSense AI</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&family=Fjalla+One&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css?v=101.0">
+
+    <!-- Configuration -->
+    <script src="js/config.js?v=3.0"></script>
+
+    <style>
+        /* My Videos Page Styles */
+        .videos-container {
+            padding-top: 100px;
+            min-height: 100vh;
+            background: var(--light);
+        }
+
+        .videos-header {
+            background: var(--white);
+            padding: var(--space-lg) 0;
+            border-bottom: 1px solid var(--gray-light);
+            margin-bottom: var(--space-lg);
+        }
+
+        .videos-header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-md);
+        }
+
+        .videos-title {
+            font-family: var(--font-display);
+            font-size: var(--font-size-2xl);
+            color: var(--dark);
+        }
+
+        .videos-stats {
+            display: flex;
+            gap: var(--space-lg);
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: var(--space-sm) var(--space-md);
+            background: var(--light);
+            border-radius: var(--radius-md);
+        }
+
+        .stat-box .value {
+            font-size: var(--font-size-xl);
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-box .label {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        /* Video Grid */
+        .videos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: var(--space-lg);
+            padding: var(--space-lg) 0;
+        }
+
+        .video-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.3s ease;
+        }
+
+        .video-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .video-thumbnail {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 9/16;
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .video-thumbnail video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-thumbnail .play-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .video-thumbnail:hover .play-overlay {
+            opacity: 1;
+        }
+
+        .play-overlay i {
+            font-size: 3rem;
+            color: white;
+        }
+
+        .video-info {
+            padding: var(--space-md);
+        }
+
+        .video-prompt {
+            font-size: var(--font-size-sm);
+            color: var(--dark);
+            margin-bottom: var(--space-sm);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .video-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: var(--font-size-xs);
+            color: var(--gray);
+            margin-bottom: var(--space-sm);
+        }
+
+        .video-expiry {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: 600;
+        }
+
+        .video-expiry.expiring-soon {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+        }
+
+        .video-expiry.expiring-medium {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .video-expiry.expiring-later {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .video-actions {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .video-actions .btn {
+            flex: 1;
+            padding: 8px 12px;
+            font-size: var(--font-size-sm);
+        }
+
+        .btn-download {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-delete {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .btn-delete:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-3xl);
+            color: var(--gray);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: var(--space-md);
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            color: var(--dark);
+            margin-bottom: var(--space-sm);
+        }
+
+        /* Video Modal */
+        .video-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .video-modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .video-modal-content {
+            max-width: 400px;
+            max-height: 90vh;
+            position: relative;
+        }
+
+        .video-modal-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        .video-modal video {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: var(--radius-lg);
+        }
+
+        /* Loading spinner */
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-3xl);
+        }
+
+        .loading-spinner i {
+            font-size: 2rem;
+            color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Retention notice */
+        .retention-notice {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 1px solid #f59e0b;
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            margin-bottom: var(--space-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .retention-notice i {
+            font-size: 1.5rem;
+            color: #f59e0b;
+        }
+
+        .retention-notice p {
+            margin: 0;
+            color: #92400e;
+        }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            .videos-header .container {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .videos-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">
+                <span class="logo-icon"><i class="fas fa-film"></i></span>
+                <span class="logo-text">ReelSense<span class="accent">AI</span></span>
+            </a>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="videos.html" class="nav-link active">My Videos</a>
+                <a href="#" class="nav-link" id="navCredits" style="display: none;">
+                    <i class="fas fa-coins"></i> <span id="creditBalance">0</span>
+                </a>
+                <a href="auth.html" class="nav-link btn-outline" id="loginBtn">Login</a>
+                <div class="user-menu" id="userMenu" style="display: none;">
+                    <button class="user-menu-btn" id="userMenuBtn">
+                        <span id="userInitials">U</span>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <div class="user-info-dropdown">
+                            <span id="userName">User</span>
+                            <span id="userEmail" class="user-email-small"></span>
+                        </div>
+                        <hr>
+                        <a href="videos.html"><i class="fas fa-video"></i> My Videos</a>
+                        <a href="#" id="adminLink" style="display: none;"><i class="fas fa-cog"></i> Admin</a>
+                        <hr>
+                        <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+
+            <button class="mobile-toggle" id="mobileToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="videos-container">
+        <!-- Header -->
+        <div class="videos-header">
+            <div class="container">
+                <div>
+                    <h1 class="videos-title"><i class="fas fa-video"></i> My Videos</h1>
+                    <p style="color: var(--gray); margin-top: 4px;">Your generated videos are saved here</p>
+                </div>
+                <div class="videos-stats">
+                    <div class="stat-box">
+                        <div class="value" id="totalVideos">0</div>
+                        <div class="label">Total Videos</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="value" id="expiringToday">0</div>
+                        <div class="label">Expiring Today</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Retention Notice -->
+            <div class="retention-notice">
+                <i class="fas fa-clock"></i>
+                <p><strong>Video Retention:</strong> Videos are automatically deleted after <span id="retentionDays">3</span> days.
+                   Download your videos before they expire!</p>
+            </div>
+
+            <!-- Videos Grid -->
+            <div id="videosContainer">
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Video Preview Modal -->
+    <div class="video-modal" id="videoModal">
+        <div class="video-modal-content">
+            <button class="video-modal-close" onclick="closeVideoModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <video id="modalVideo" controls playsinline>
+                <source src="" type="video/mp4">
+            </video>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="js/videos.js?v=1.0"></script>
+</body>
+</html>

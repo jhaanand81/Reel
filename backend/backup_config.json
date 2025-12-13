@@ -1,0 +1,12 @@
+{
+    "encryption_enabled": true,
+    "backup_database": true,
+    "backup_config": true,
+    "backup_videos": false,
+    "backup_logs": true,
+    "max_local_backups": 7,
+    "google_drive_enabled": false,
+    "google_drive_folder_id": "PASTE_YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE",
+    "service_account_file": "service_account.json",
+    "notification_email": null
+}

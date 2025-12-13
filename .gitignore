@@ -1,0 +1,60 @@
+# Environment variables (NEVER commit these)
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Generated outputs (large files)
+backend/outputs/videos/*/
+backend/outputs/audio/*/
+backend/outputs/scripts/*.json
+
+# Database
+*.db
+data/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups
+backups/
+releases/
+
+# Credentials (never commit)
+service_account.json
+*.pem
+*.key
+
+# Demo files (large)
+sample_demo.mp4

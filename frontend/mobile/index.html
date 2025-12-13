@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#FFFFFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Reel Sense">
+    <title>Reel Sense</title>
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fjalla+One&family=Source+Sans+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #8B2635;
+            --primary-light: #A63446;
+            --primary-dark: #6B1D28;
+            --accent: #D4A84B;
+            --accent-light: #E8C476;
+            --dark: #1A1A1A;
+            --dark-light: #2C2C2C;
+            --gray-900: #111111;
+            --gray-800: #1F1F1F;
+            --gray-700: #374151;
+            --gray-600: #4B5563;
+            --gray-500: #6B7280;
+            --gray-400: #9CA3AF;
+            --gray-300: #D1D5DB;
+            --gray-200: #E5E7EB;
+            --gray-100: #F3F4F6;
+            --gray-50: #F9FAFB;
+            --white: #FFFFFF;
+            --success: #10B981;
+            --error: #EF4444;
+            --warning: #F59E0B;
+            --info: #3B82F6;
+            --shadow-soft: 0 4px 24px -4px rgba(0,0,0,0.08);
+            --shadow-medium: 0 8px 32px -8px rgba(0,0,0,0.12);
+            --shadow-strong: 0 16px 48px -12px rgba(0,0,0,0.18);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html { scroll-behavior: smooth; height: 100%; }
+        body {
+            font-family: 'Source Sans Pro', -apple-system, sans-serif;
+            background: var(--gray-50);
+            color: var(--dark);
+            min-height: 100%;
+            height: 100%;
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+        }
+
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes progress { from { width: 0; } }
+
+        /* Splash */
+        .splash {
+            position: fixed; inset: 0; background: linear-gradient(135deg, var(--white), var(--gray-100));
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 9999; transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .splash.hide { opacity: 0; visibility: hidden; }
+        .splash-logo { width: 80px; height: 80px; margin-bottom: 24px; }
+        .splash-brand { font-family: 'Fjalla One', sans-serif; font-size: 28px; letter-spacing: 4px; color: var(--dark); }
+        .splash-brand span { color: var(--gray-400); }
+        .splash-loader { margin-top: 40px; width: 120px; height: 3px; background: var(--gray-200); border-radius: 3px; overflow: hidden; }
+        .splash-loader::after { content: ''; display: block; width: 40%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); animation: loadSlide 1s ease-in-out infinite; }
+        @keyframes loadSlide { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }
+
+        /* App Container */
+        .app { display: none; position: fixed; inset: 0; overflow: hidden; }
+        .app.active { display: block; animation: fadeIn 0.4s ease; }
+
+        /* Screens - Each screen is a full-page view */
+        .screen {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--gray-50);
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            padding-bottom: 90px;
+            z-index: 1;
+        }
+        .screen.active { display: block; animation: fadeIn 0.3s ease; z-index: 10; }
+
+        /* Header */
+        .header {
+            background: var(--white); padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top));
+            display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow-soft);
+            position: sticky; top: 0; z-index: 50;
+        }
+        .header-back { width: 40px; height: 40px; background: var(--gray-100); border: none; border-radius: 12px; color: var(--dark); font-size: 16px; cursor: pointer; }
+        .header-title { flex: 1; font-family: 'Fjalla One', sans-serif; font-size: 18px; letter-spacing: 1px; }
+        .header-action { width: 40px; height: 40px; background: var(--gray-100); border: none; border-radius: 12px; color: var(--dark); font-size: 16px; cursor: pointer; }
+
+        /* Home Header */
+        .home-header { background: var(--white); padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow-soft); }
+        .user-avatar { width: 48px; height: 48px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); border-radius: 14px; display: flex; align-items: center; justify-content: center; color: var(--white); font-family: 'Fjalla One', sans-serif; font-size: 18px; }
+        .user-info { flex: 1; }
+        .user-greeting { font-size: 12px; color: var(--gray-500); }
+        .user-name { font-family: 'Fjalla One', sans-serif; font-size: 18px; color: var(--dark); }
+        .notif-btn { width: 44px; height: 44px; background: var(--gray-100); border: none; border-radius: 12px; color: var(--dark); font-size: 16px; cursor: pointer; position: relative; }
+        .notif-btn::after { content: ''; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; background: var(--primary); border-radius: 50%; border: 2px solid var(--white); }
+
+        /* Content */
+        .content { padding: 20px; }
+
+        /* Cards */
+        .card { background: var(--white); border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-soft); }
+        .card-title { font-family: 'Fjalla One', sans-serif; font-size: 14px; color: var(--gray-500); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 14px; }
+
+        /* Hero Card */
+        .hero-card {
+            background: linear-gradient(135deg, var(--dark), var(--gray-800)); border-radius: 20px;
+            padding: 28px 24px; margin-bottom: 24px; text-align: center; position: relative; overflow: hidden;
+        }
+        .hero-card::before { content: ''; position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(139,38,53,0.15), transparent 50%); }
+        .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 20px; font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+        .hero-title { font-family: 'Fjalla One', sans-serif; font-size: 26px; color: var(--white); letter-spacing: 1px; margin-bottom: 10px; line-height: 1.2; position: relative; z-index: 1; }
+        .hero-subtitle { font-size: 14px; color: rgba(255,255,255,0.6); margin-bottom: 22px; position: relative; z-index: 1; }
+        .hero-btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 28px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: var(--white); border: none; border-radius: 12px; font-family: 'Fjalla One', sans-serif; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; cursor: pointer; position: relative; z-index: 1; }
+
+        /* Stats Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px; }
+        .stat-card { background: var(--white); border-radius: 14px; padding: 18px; box-shadow: var(--shadow-soft); }
+        .stat-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; font-size: 16px; }
+        .stat-icon.videos { background: rgba(139,38,53,0.1); color: var(--primary); }
+        .stat-icon.time { background: rgba(16,185,129,0.1); color: var(--success); }
+        .stat-icon.engagement { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .stat-icon.credits { background: rgba(59,130,246,0.1); color: var(--info); }
+        .stat-value { font-family: 'Fjalla One', sans-serif; font-size: 24px; color: var(--dark); }
+        .stat-label { font-size: 11px; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Project List */
+        .project-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--gray-100); cursor: pointer; }
+        .project-item:last-child { border-bottom: none; }
+        .project-thumb { width: 64px; height: 48px; background: linear-gradient(135deg, var(--gray-200), var(--gray-100)); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--gray-400); font-size: 18px; overflow: hidden; }
+        .project-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .project-info { flex: 1; }
+        .project-title { font-weight: 600; color: var(--dark); font-size: 15px; margin-bottom: 2px; }
+        .project-meta { display: flex; align-items: center; gap: 8px; }
+        .project-date { font-size: 12px; color: var(--gray-500); }
+        .project-status { font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: 600; text-transform: uppercase; }
+        .project-status.done { background: rgba(16,185,129,0.1); color: var(--success); }
+        .project-status.processing { background: rgba(245,158,11,0.1); color: var(--warning); }
+        .project-status.failed { background: rgba(239,68,68,0.1); color: var(--error); }
+        .project-arrow { color: var(--gray-300); font-size: 14px; }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 40px 20px; }
+        .empty-icon { width: 64px; height: 64px; background: var(--gray-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 24px; color: var(--gray-400); }
+        .empty-title { font-family: 'Fjalla One', sans-serif; font-size: 18px; color: var(--dark); margin-bottom: 6px; }
+        .empty-text { font-size: 14px; color: var(--gray-500); }
+
+        /* Login Screen */
+        .login-screen { background: var(--white); display: flex; flex-direction: column; padding-bottom: 0 !important; }
+        .login-header { background: linear-gradient(180deg, var(--gray-50), var(--white)); padding: 48px 24px 32px; text-align: center; }
+        .login-logo-wrap { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 12px; }
+        .login-logo { width: 48px; height: 48px; }
+        .login-brand { font-family: 'Fjalla One', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--dark); }
+        .login-brand span { color: var(--gray-400); }
+        .login-tagline { font-size: 11px; color: var(--gray-500); letter-spacing: 2px; text-transform: uppercase; }
+        .login-content { flex: 1; padding: 24px; max-width: 400px; margin: 0 auto; width: 100%; }
+
+        /* QR Card */
+        .qr-card { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 16px; padding: 24px; margin-bottom: 28px; text-align: center; }
+        .qr-icon { width: 60px; height: 60px; background: var(--gray-100); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+        .qr-icon i { font-size: 26px; color: var(--primary); }
+        .qr-title { font-family: 'Fjalla One', sans-serif; font-size: 16px; letter-spacing: 1px; color: var(--dark); margin-bottom: 4px; }
+        .qr-subtitle { font-size: 13px; color: var(--gray-500); margin-bottom: 18px; }
+        .qr-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; background: var(--dark); color: var(--white); border: none; border-radius: 10px; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+
+        /* Divider */
+        .divider { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+        .divider span { font-size: 11px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Auth Tabs */
+        .auth-tabs { display: flex; background: var(--gray-100); border-radius: 10px; padding: 4px; margin-bottom: 24px; }
+        .auth-tab { flex: 1; padding: 12px; border: none; background: transparent; font-family: 'Fjalla One', sans-serif; font-size: 13px; letter-spacing: 1px; color: var(--gray-500); cursor: pointer; border-radius: 8px; transition: all 0.2s; }
+        .auth-tab.active { background: var(--white); color: var(--dark); box-shadow: var(--shadow-soft); }
+
+        /* Forms */
+        .auth-form { display: none; }
+        .auth-form.active { display: block; animation: fadeInUp 0.3s ease; }
+        .form-group { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-600); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .form-input { width: 100%; padding: 14px 16px; background: var(--gray-50); border: 2px solid transparent; border-radius: 10px; font-family: inherit; font-size: 16px; color: var(--dark); transition: all 0.2s; }
+        .form-input:focus { outline: none; background: var(--white); border-color: var(--primary); }
+        .form-input::placeholder { color: var(--gray-400); }
+        .input-wrap { position: relative; }
+        .input-toggle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--gray-400); cursor: pointer; }
+        .btn-submit { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: var(--white); border: none; border-radius: 10px; font-family: 'Fjalla One', sans-serif; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; margin-top: 8px; }
+        .btn-submit:disabled { background: var(--gray-300); cursor: not-allowed; }
+        .btn-submit .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: var(--white); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+        .form-error { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 12px; margin-top: 14px; display: none; align-items: center; gap: 10px; font-size: 13px; color: var(--error); }
+        .form-error.show { display: flex; }
+
+        /* Create Video Screen */
+        .create-header { background: var(--white); padding: 16px 20px; padding-top: max(16px, env(safe-area-inset-top)); box-shadow: var(--shadow-soft); }
+        .create-progress { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+        .progress-step { flex: 1; height: 4px; background: var(--gray-200); border-radius: 2px; transition: all 0.3s; }
+        .progress-step.active { background: var(--primary); }
+        .progress-step.done { background: var(--success); }
+        .stage-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--gray-500); }
+
+        /* Stage Content */
+        .stage { display: none; padding: 20px; }
+        .stage.active { display: block; animation: fadeInUp 0.3s ease; }
+        .stage-title { font-family: 'Fjalla One', sans-serif; font-size: 22px; color: var(--dark); letter-spacing: 1px; margin-bottom: 6px; }
+        .stage-desc { font-size: 14px; color: var(--gray-500); margin-bottom: 24px; }
+
+        /* Select Options */
+        .select-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+        .select-option { background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .select-option.active { border-color: var(--primary); background: rgba(139,38,53,0.05); }
+        .select-option i { font-size: 24px; color: var(--gray-400); margin-bottom: 8px; display: block; }
+        .select-option.active i { color: var(--primary); }
+        .select-option span { font-size: 13px; font-weight: 600; color: var(--dark); display: block; }
+
+        /* Duration Options */
+        .duration-options { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .duration-btn { padding: 10px 18px; background: var(--white); border: 2px solid var(--gray-200); border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--dark); cursor: pointer; transition: all 0.2s; }
+        .duration-btn.active { border-color: var(--primary); background: rgba(139,38,53,0.05); color: var(--primary); }
+
+        /* Textarea */
+        .form-textarea { width: 100%; padding: 14px 16px; background: var(--white); border: 2px solid var(--gray-200); border-radius: 12px; font-family: inherit; font-size: 15px; color: var(--dark); resize: none; min-height: 100px; transition: all 0.2s; }
+        .form-textarea:focus { outline: none; border-color: var(--primary); }
+        .char-count { text-align: right; font-size: 12px; color: var(--gray-400); margin-top: 6px; }
+
+        /* Script Preview */
+        .script-preview { background: var(--gray-50); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .script-text { font-size: 15px; line-height: 1.6; color: var(--dark); white-space: pre-wrap; }
+        .script-stats { display: flex; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--gray-200); }
+        .script-stat { font-size: 12px; color: var(--gray-500); }
+        .script-stat strong { color: var(--dark); }
+
+        /* Video Preview */
+        .video-preview { background: var(--dark); border-radius: 16px; aspect-ratio: 9/16; max-height: 400px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .video-preview video { width: 100%; height: 100%; object-fit: contain; }
+        .video-placeholder { text-align: center; color: var(--gray-400); }
+        .video-placeholder i { font-size: 48px; margin-bottom: 12px; display: block; }
+        .video-placeholder span { font-size: 14px; }
+
+        /* Progress Indicator */
+        .progress-indicator { background: var(--white); border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align: center; }
+        .progress-circle { width: 80px; height: 80px; border-radius: 50%; background: conic-gradient(var(--primary) var(--progress, 0%), var(--gray-200) 0%); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; position: relative; }
+        .progress-circle::before { content: ''; position: absolute; inset: 8px; background: var(--white); border-radius: 50%; }
+        .progress-value { position: relative; font-family: 'Fjalla One', sans-serif; font-size: 20px; color: var(--dark); }
+        .progress-label { font-size: 14px; color: var(--gray-500); }
+        .progress-status { font-size: 13px; color: var(--primary); margin-top: 8px; font-weight: 600; }
+
+        /* Action Buttons */
+        .action-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); padding: 16px 20px; padding-bottom: max(16px, env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0,0,0,0.08); display: flex; gap: 12px; z-index: 100; }
+        .btn { flex: 1; padding: 16px; border-radius: 12px; font-family: 'Fjalla One', sans-serif; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: var(--white); border: none; }
+        .btn-primary:disabled { background: var(--gray-300); cursor: not-allowed; }
+        .btn-secondary { background: var(--gray-100); color: var(--dark); border: none; }
+        .btn-outline { background: transparent; color: var(--primary); border: 2px solid var(--primary); }
+
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-top: 1px solid var(--gray-200); padding: 8px 16px; padding-bottom: max(8px, env(safe-area-inset-bottom)); display: none; justify-content: space-around; z-index: 100; }
+        .bottom-nav.show { display: flex; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; background: transparent; border: none; color: var(--gray-400); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; position: relative; }
+        .nav-item i { font-size: 20px; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item.active::before { content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 20px; height: 3px; background: var(--primary); border-radius: 0 0 3px 3px; }
+
+        /* QR Modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal.active { display: flex; animation: fadeIn 0.2s ease; }
+        .modal-content { background: var(--white); border-radius: 20px; width: 100%; max-width: 360px; overflow: hidden; animation: fadeInUp 0.3s ease; }
+        .modal-header { padding: 20px; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
+        .modal-title { font-family: 'Fjalla One', sans-serif; font-size: 18px; letter-spacing: 1px; }
+        .modal-close { width: 36px; height: 36px; background: var(--gray-100); border: none; border-radius: 10px; color: var(--dark); font-size: 16px; cursor: pointer; }
+        .modal-body { padding: 20px; }
+
+        /* QR Scanner Modal */
+        .qr-modal { position: fixed; inset: 0; background: var(--dark); z-index: 1000; display: none; flex-direction: column; }
+        .qr-modal.active { display: flex; }
+        .qr-modal-header { position: absolute; top: 0; left: 0; right: 0; padding: 20px; padding-top: max(20px, env(safe-area-inset-top)); display: flex; justify-content: space-between; z-index: 10; }
+        .qr-modal-btn { width: 44px; height: 44px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: var(--white); font-size: 18px; cursor: pointer; }
+        #qr-reader { width: 100%; height: 100%; }
+        #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover; }
+        .qr-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 240px; height: 240px; border: 2px solid rgba(255,255,255,0.3); border-radius: 20px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); }
+        .qr-modal-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 24px; padding-bottom: max(24px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,0.8)); text-align: center; }
+        .qr-modal-footer h3 { font-family: 'Fjalla One', sans-serif; font-size: 20px; color: var(--white); margin-bottom: 8px; }
+        .qr-modal-footer p { font-size: 14px; color: rgba(255,255,255,0.6); }
+
+        /* Settings Screen */
+        .profile-card { background: var(--white); border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 20px; box-shadow: var(--shadow-soft); }
+        .profile-avatar { width: 56px; height: 56px; background: linear-gradient(135deg, var(--primary), var(--primary-light)); border-radius: 16px; display: flex; align-items: center; justify-content: center; color: var(--white); font-family: 'Fjalla One', sans-serif; font-size: 22px; }
+        .profile-info { flex: 1; }
+        .profile-name { font-family: 'Fjalla One', sans-serif; font-size: 18px; color: var(--dark); }
+        .profile-email { font-size: 13px; color: var(--gray-500); }
+        .settings-group { margin-bottom: 24px; }
+        .settings-group-title { font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding-left: 4px; }
+        .settings-list { background: var(--white); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-soft); }
+        .settings-item { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 1px solid var(--gray-100); cursor: pointer; }
+        .settings-item:last-child { border-bottom: none; }
+        .settings-item-icon { width: 38px; height: 38px; background: var(--gray-100); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--gray-600); font-size: 15px; }
+        .settings-item-content { flex: 1; }
+        .settings-item-title { font-weight: 600; color: var(--dark); font-size: 14px; }
+        .settings-item-subtitle { font-size: 12px; color: var(--gray-500); }
+        .settings-item i.fa-chevron-right { color: var(--gray-300); font-size: 14px; }
+        .logout-btn { width: 100%; padding: 16px; background: var(--white); border: 2px solid var(--error); border-radius: 12px; color: var(--error); font-family: 'Fjalla One', sans-serif; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+
+        /* Toast */
+        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--dark); color: var(--white); padding: 14px 24px; border-radius: 12px; font-size: 14px; opacity: 0; transition: all 0.3s; z-index: 1001; display: flex; align-items: center; gap: 10px; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+
+        /* Video Detail Modal */
+        .video-modal { position: fixed; inset: 0; background: var(--dark); z-index: 1000; display: none; flex-direction: column; }
+        .video-modal.active { display: flex; }
+        .video-modal-header { position: absolute; top: 0; left: 0; right: 0; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); display: flex; justify-content: space-between; z-index: 10; background: linear-gradient(rgba(0,0,0,0.6), transparent); }
+        .video-modal-content { flex: 1; display: flex; align-items: center; justify-content: center; }
+        .video-modal-content video { max-width: 100%; max-height: 100%; }
+        .video-modal-footer { position: absolute; bottom: 0; left: 0; right: 0; padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,0.8)); }
+        .video-actions { display: flex; gap: 12px; }
+        .video-action-btn { flex: 1; padding: 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: var(--white); font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .video-action-btn.primary { background: var(--primary); border-color: var(--primary); }
+    </style>
+</head>
+<body>
+    <!-- Splash -->
+    <div class="splash" id="splash">
+        <svg class="splash-logo" viewBox="0 0 80 80" fill="none">
+            <circle cx="40" cy="16" r="10" fill="#D4A84B"/>
+            <circle cx="16" cy="40" r="10" fill="#8B2635"/>
+            <circle cx="64" cy="40" r="10" fill="#2C2C2C"/>
+            <circle cx="26" cy="64" r="10" fill="#6B7280"/>
+            <circle cx="54" cy="64" r="10" fill="#9CA3AF"/>
+            <line x1="40" y1="16" x2="16" y2="40" stroke="#1A1A1A" stroke-width="2.5"/>
+            <line x1="40" y1="16" x2="64" y2="40" stroke="#1A1A1A" stroke-width="2.5"/>
+            <line x1="16" y1="40" x2="26" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+            <line x1="64" y1="40" x2="54" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+            <line x1="26" y1="64" x2="54" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+        </svg>
+        <div class="splash-brand">REEL<span>SENSE</span></div>
+        <div class="splash-loader"></div>
+    </div>
+
+    <!-- App -->
+    <div class="app" id="app">
+        <!-- Login Screen -->
+        <div class="screen login-screen" id="loginScreen">
+            <div class="login-header">
+                <div class="login-logo-wrap">
+                    <svg class="login-logo" viewBox="0 0 80 80" fill="none">
+                        <circle cx="40" cy="16" r="10" fill="#D4A84B"/>
+                        <circle cx="16" cy="40" r="10" fill="#8B2635"/>
+                        <circle cx="64" cy="40" r="10" fill="#2C2C2C"/>
+                        <circle cx="26" cy="64" r="10" fill="#6B7280"/>
+                        <circle cx="54" cy="64" r="10" fill="#9CA3AF"/>
+                        <line x1="40" y1="16" x2="16" y2="40" stroke="#1A1A1A" stroke-width="2.5"/>
+                        <line x1="40" y1="16" x2="64" y2="40" stroke="#1A1A1A" stroke-width="2.5"/>
+                        <line x1="16" y1="40" x2="26" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+                        <line x1="64" y1="40" x2="54" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+                        <line x1="26" y1="64" x2="54" y2="64" stroke="#1A1A1A" stroke-width="2.5"/>
+                    </svg>
+                    <div class="login-brand">REEL<span>SENSE</span></div>
+                </div>
+                <div class="login-tagline">Tailored. Trusted. Transformative.</div>
+            </div>
+            <div class="login-content">
+                <div class="qr-card">
+                    <div class="qr-icon"><i class="fas fa-qrcode"></i></div>
+                    <div class="qr-title">INSTANT LOGIN</div>
+                    <div class="qr-subtitle">Scan QR code from web dashboard</div>
+                    <button class="qr-btn" onclick="openQRScanner()"><i class="fas fa-camera"></i> Scan QR Code</button>
+                </div>
+                <div class="divider"><span>or continue with email</span></div>
+                <div class="auth-tabs">
+                    <button class="auth-tab active" onclick="switchAuthTab('login')">Sign In</button>
+                    <button class="auth-tab" onclick="switchAuthTab('register')">Create Account</button>
+                </div>
+                <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="loginEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <div class="input-wrap">
+                            <input type="password" class="form-input" id="loginPassword" placeholder="Enter password" required>
+                            <button type="button" class="input-toggle" onclick="togglePassword('loginPassword')"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="loginBtn">Sign In</button>
+                    <div class="form-error" id="loginError"><i class="fas fa-exclamation-circle"></i><span></span></div>
+                </form>
+                <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" id="registerName" placeholder="Your name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="registerEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <div class="input-wrap">
+                            <input type="password" class="form-input" id="registerPassword" placeholder="Min. 8 characters" minlength="8" required>
+                            <button type="button" class="input-toggle" onclick="togglePassword('registerPassword')"><i class="fas fa-eye"></i></button>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="registerBtn">Create Account</button>
+                    <div class="form-error" id="registerError"><i class="fas fa-exclamation-circle"></i><span></span></div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Home Screen -->
+        <div class="screen" id="homeScreen">
+            <div class="home-header">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-info">
+                    <div class="user-greeting">Welcome back,</div>
+                    <div class="user-name" id="userName">User</div>
+                </div>
+                <button class="notif-btn"><i class="fas fa-bell"></i></button>
+            </div>
+            <div class="content">
+                <div class="hero-card">
+                    <div class="hero-badge"><i class="fas fa-sparkles"></i> AI-Powered</div>
+                    <div class="hero-title">CREATE STUNNING<br>VIDEO ADS</div>
+                    <div class="hero-subtitle">Transform ideas into captivating videos</div>
+                    <button class="hero-btn" onclick="startCreateVideo()"><i class="fas fa-plus"></i> Create Video</button>
+                </div>
+                <div class="card-title">Quick Stats</div>
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card">
+                        <div class="stat-icon videos"><i class="fas fa-video"></i></div>
+                        <div class="stat-value" id="statVideos">0</div>
+                        <div class="stat-label">Videos</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon time"><i class="fas fa-clock"></i></div>
+                        <div class="stat-value" id="statTime">0m</div>
+                        <div class="stat-label">Time Saved</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon engagement"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-value" id="statEngagement">0%</div>
+                        <div class="stat-label">Engagement</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon credits"><i class="fas fa-coins"></i></div>
+                        <div class="stat-value" id="statCredits">1000</div>
+                        <div class="stat-label">Credits</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Recent Projects</div>
+                    <div id="projectsList">
+                        <div class="empty-state">
+                            <div class="empty-icon"><i class="fas fa-film"></i></div>
+                            <div class="empty-title">No projects yet</div>
+                            <div class="empty-text">Create your first video to get started</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Screen -->
+        <div class="screen" id="projectsScreen">
+            <div class="header">
+                <div class="header-title">MY PROJECTS</div>
+                <button class="header-action" onclick="startCreateVideo()"><i class="fas fa-plus"></i></button>
+            </div>
+            <div class="content">
+                <div id="allProjectsList">
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                        <div class="empty-title">No projects found</div>
+                        <div class="empty-text">Your video projects will appear here</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Video Screen -->
+        <div class="screen" id="createScreen">
+            <div class="create-header">
+                <div class="header" style="padding: 0; box-shadow: none; position: static;">
+                    <button class="header-back" onclick="exitCreateVideo()"><i class="fas fa-xmark"></i></button>
+                    <div class="header-title">CREATE VIDEO</div>
+                    <button class="header-action" onclick="saveProject()"><i class="fas fa-save"></i></button>
+                </div>
+                <div class="create-progress">
+                    <div class="progress-step" id="step1"></div>
+                    <div class="progress-step" id="step2"></div>
+                    <div class="progress-step" id="step3"></div>
+                    <div class="progress-step" id="step4"></div>
+                    <div class="progress-step" id="step5"></div>
+                </div>
+                <div class="stage-info">
+                    <span id="stageNumber">Stage 1 of 5</span>
+                    <span id="stageName">Define</span>
+                </div>
+            </div>
+
+            <!-- Stage 1: Define -->
+            <div class="stage" id="stage1">
+                <div class="stage-title">Define Your Video</div>
+                <div class="stage-desc">Choose the type and duration of your video ad</div>
+
+                <div class="form-label">Reel Type</div>
+                <div class="select-grid">
+                    <div class="select-option active" data-value="ai-generated" onclick="selectOption(this, 'reelType')">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        <span>AI Generated</span>
+                    </div>
+                    <div class="select-option" data-value="stock" onclick="selectOption(this, 'reelType')">
+                        <i class="fas fa-photo-film"></i>
+                        <span>Stock Footage</span>
+                    </div>
+                    <div class="select-option" data-value="animation" onclick="selectOption(this, 'reelType')">
+                        <i class="fas fa-shapes"></i>
+                        <span>Animation</span>
+                    </div>
+                    <div class="select-option" data-value="hybrid" onclick="selectOption(this, 'reelType')">
+                        <i class="fas fa-layer-group"></i>
+                        <span>Hybrid</span>
+                    </div>
+                </div>
+
+                <div class="form-label">Duration</div>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn" data-value="5" onclick="selectDuration(this)">5s</button>
+                    <button type="button" class="duration-btn" data-value="10" onclick="selectDuration(this)">10s</button>
+                    <button type="button" class="duration-btn active" data-value="15" onclick="selectDuration(this)">15s</button>
+                    <button type="button" class="duration-btn" data-value="30" onclick="selectDuration(this)">30s</button>
+                    <button type="button" class="duration-btn" data-value="60" onclick="selectDuration(this)">60s</button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Topic / Product Name</label>
+                    <input type="text" class="form-input" id="topicInput" placeholder="e.g., Nike Running Shoes" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Brand (Optional)</label>
+                    <input type="text" class="form-input" id="brandInput" placeholder="e.g., Nike">
+                </div>
+            </div>
+
+            <!-- Stage 2: Script -->
+            <div class="stage" id="stage2">
+                <div class="stage-title">AI Script Generation</div>
+                <div class="stage-desc">Let AI create a compelling script for your video</div>
+
+                <div class="form-label">Script Length</div>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn" data-value="short" onclick="selectScriptLength(this)">Short</button>
+                    <button type="button" class="duration-btn active" data-value="medium" onclick="selectScriptLength(this)">Medium</button>
+                    <button type="button" class="duration-btn" data-value="long" onclick="selectScriptLength(this)">Long</button>
+                </div>
+
+                <div class="form-label">Tone</div>
+                <div class="duration-options">
+                    <button type="button" class="duration-btn active" data-value="professional" onclick="selectTone(this)">Professional</button>
+                    <button type="button" class="duration-btn" data-value="witty" onclick="selectTone(this)">Witty</button>
+                    <button type="button" class="duration-btn" data-value="funny" onclick="selectTone(this)">Funny</button>
+                    <button type="button" class="duration-btn" data-value="serious" onclick="selectTone(this)">Serious</button>
+                </div>
+
+                <div id="scriptPreviewContainer" style="display: none;">
+                    <div class="form-label">Generated Script</div>
+                    <div class="script-preview">
+                        <div class="script-text" id="scriptText"></div>
+                        <div class="script-stats">
+                            <span class="script-stat"><strong id="wordCount">0</strong> words</span>
+                            <span class="script-stat"><strong id="estDuration">0</strong>s estimated</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="scriptLoading" style="display: none;">
+                    <div class="progress-indicator">
+                        <div class="progress-circle" style="--progress: 50%">
+                            <div class="progress-value"><i class="fas fa-spinner fa-spin"></i></div>
+                        </div>
+                        <div class="progress-label">Generating script...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 3: Video Generation -->
+            <div class="stage" id="stage3">
+                <div class="stage-title">Video Generation</div>
+                <div class="stage-desc">AI is creating your video based on the script</div>
+
+                <div id="videoGenerating">
+                    <div class="progress-indicator">
+                        <div class="progress-circle" id="videoProgressCircle" style="--progress: 0%">
+                            <div class="progress-value" id="videoProgressValue">0%</div>
+                        </div>
+                        <div class="progress-label" id="videoProgressLabel">Initializing...</div>
+                        <div class="progress-status" id="videoProgressStatus">Please wait, this may take a few minutes</div>
+                    </div>
+                </div>
+
+                <div id="videoPreviewContainer" style="display: none;">
+                    <div class="video-preview">
+                        <video id="generatedVideo" controls></video>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 4: Edit -->
+            <div class="stage" id="stage4">
+                <div class="stage-title">Edit & Refine</div>
+                <div class="stage-desc">Add captions and voice-over to your video</div>
+
+                <div class="video-preview">
+                    <video id="editVideo" controls></video>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <div class="settings-item" onclick="addCaptions()">
+                        <div class="settings-item-icon"><i class="fas fa-closed-captioning"></i></div>
+                        <div class="settings-item-content">
+                            <div class="settings-item-title">Add Captions</div>
+                            <div class="settings-item-subtitle">Auto-generate captions from script</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="settings-item" onclick="regenerateVoiceover()">
+                        <div class="settings-item-icon"><i class="fas fa-microphone"></i></div>
+                        <div class="settings-item-content">
+                            <div class="settings-item-title">Voice-Over</div>
+                            <div class="settings-item-subtitle">Change voice type or regenerate</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 5: Publish -->
+            <div class="stage" id="stage5">
+                <div class="stage-title">Publish & Share</div>
+                <div class="stage-desc">Download or share your completed video</div>
+
+                <div class="video-preview">
+                    <video id="finalVideo" controls></video>
+                </div>
+
+                <div class="card" style="margin-top: 20px;">
+                    <div class="settings-item" onclick="downloadVideo()">
+                        <div class="settings-item-icon" style="background: rgba(16,185,129,0.1); color: var(--success);"><i class="fas fa-download"></i></div>
+                        <div class="settings-item-content">
+                            <div class="settings-item-title">Download Video</div>
+                            <div class="settings-item-subtitle">Save MP4 to your device</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                    <div class="settings-item" onclick="shareVideo()">
+                        <div class="settings-item-icon" style="background: rgba(59,130,246,0.1); color: var(--info);"><i class="fas fa-share-nodes"></i></div>
+                        <div class="settings-item-content">
+                            <div class="settings-item-title">Share</div>
+                            <div class="settings-item-subtitle">Copy link or share to social</div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Bar -->
+            <div class="action-bar" id="createActionBar">
+                <button class="btn btn-secondary" id="prevBtn" onclick="prevStage()" style="display: none;"><i class="fas fa-arrow-left"></i> Back</button>
+                <button class="btn btn-primary" id="nextBtn" onclick="nextStage()">Next <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div class="screen" id="settingsScreen">
+            <div class="header">
+                <div class="header-title">SETTINGS</div>
+            </div>
+            <div class="content">
+                <div class="profile-card">
+                    <div class="profile-avatar" id="settingsAvatar">U</div>
+                    <div class="profile-info">
+                        <div class="profile-name" id="settingsName">User</div>
+                        <div class="profile-email" id="settingsEmail">user@example.com</div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">Account</div>
+                    <div class="settings-list">
+                        <div class="settings-item">
+                            <div class="settings-item-icon"><i class="fas fa-user"></i></div>
+                            <div class="settings-item-content">
+                                <div class="settings-item-title">Profile</div>
+                                <div class="settings-item-subtitle">Edit your information</div>
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-icon"><i class="fas fa-key"></i></div>
+                            <div class="settings-item-content">
+                                <div class="settings-item-title">API Key</div>
+                                <div class="settings-item-subtitle" id="apiKeyDisplay">Click to view</div>
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">Preferences</div>
+                    <div class="settings-list">
+                        <div class="settings-item">
+                            <div class="settings-item-icon"><i class="fas fa-bell"></i></div>
+                            <div class="settings-item-content">
+                                <div class="settings-item-title">Notifications</div>
+                                <div class="settings-item-subtitle">Push & email alerts</div>
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="settings-item">
+                            <div class="settings-item-icon"><i class="fas fa-circle-question"></i></div>
+                            <div class="settings-item-content">
+                                <div class="settings-item-title">Help & Support</div>
+                                <div class="settings-item-subtitle">FAQs & contact us</div>
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-right-from-bracket"></i> Log Out</button>
+            </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav" id="bottomNav">
+            <button class="nav-item active" onclick="showScreen('home')"><i class="fas fa-home"></i><span>Home</span></button>
+            <button class="nav-item" onclick="showScreen('projects')"><i class="fas fa-folder"></i><span>Projects</span></button>
+            <button class="nav-item" onclick="showScreen('settings')"><i class="fas fa-gear"></i><span>Settings</span></button>
+        </nav>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div class="qr-modal" id="qrModal">
+        <div class="qr-modal-header">
+            <button class="qr-modal-btn" onclick="closeQRScanner()"><i class="fas fa-xmark"></i></button>
+            <button class="qr-modal-btn"><i class="fas fa-bolt"></i></button>
+        </div>
+        <div id="qr-reader"></div>
+        <div class="qr-frame"></div>
+        <div class="qr-modal-footer">
+            <h3>SCAN QR CODE</h3>
+            <p>Open ReelSense on your computer and click "Login with Mobile"</p>
+        </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="video-modal" id="videoModal">
+        <div class="video-modal-header">
+            <button class="qr-modal-btn" onclick="closeVideoModal()"><i class="fas fa-xmark"></i></button>
+            <button class="qr-modal-btn" onclick="shareCurrentVideo()"><i class="fas fa-share-nodes"></i></button>
+        </div>
+        <div class="video-modal-content">
+            <video id="modalVideo" controls></video>
+        </div>
+        <div class="video-modal-footer">
+            <div class="video-actions">
+                <button class="video-action-btn" onclick="downloadCurrentVideo()"><i class="fas fa-download"></i> Download</button>
+                <button class="video-action-btn primary" onclick="closeVideoModal()"><i class="fas fa-check"></i> Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"><i class="fas fa-check-circle"></i><span></span></div>
+
+    <script>
+        // Config
+        const API = window.location.origin + '/api/v1';
+        let user = null, token = null, qrScanner = null;
+        let currentProject = null, currentStage = 1;
+        let projects = [];
+        let videoJobId = null, pollInterval = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.getElementById('splash').classList.add('hide');
+                document.getElementById('app').classList.add('active');
+                checkAuth();
+            }, 1500);
+        });
+
+        // Auth Check
+        function checkAuth() {
+            token = localStorage.getItem('token');
+            const userData = localStorage.getItem('user');
+            if (token && userData) {
+                user = JSON.parse(userData);
+                showDashboard();
+                loadProjects();
+            } else {
+                showScreen('login');
+            }
+        }
+
+        // Screen Management
+        function showScreen(screen) {
+            // Hide all screens first
+            document.querySelectorAll('.screen').forEach(s => {
+                s.classList.remove('active');
+                s.scrollTop = 0; // Reset scroll position
+            });
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+            const nav = document.getElementById('bottomNav');
+            let targetScreen = null;
+
+            if (screen === 'login') {
+                targetScreen = document.getElementById('loginScreen');
+                nav.classList.remove('show');
+            } else if (screen === 'home') {
+                targetScreen = document.getElementById('homeScreen');
+                document.querySelector('.nav-item:nth-child(1)').classList.add('active');
+                nav.classList.add('show');
+            } else if (screen === 'projects') {
+                targetScreen = document.getElementById('projectsScreen');
+                document.querySelector('.nav-item:nth-child(2)').classList.add('active');
+                nav.classList.add('show');
+                renderAllProjects();
+            } else if (screen === 'settings') {
+                targetScreen = document.getElementById('settingsScreen');
+                document.querySelector('.nav-item:nth-child(3)').classList.add('active');
+                nav.classList.add('show');
+            } else if (screen === 'create') {
+                targetScreen = document.getElementById('createScreen');
+                nav.classList.remove('show');
+            }
+
+            // Show target screen and reset its scroll
+            if (targetScreen) {
+                targetScreen.scrollTop = 0;
+                targetScreen.classList.add('active');
+            }
+        }
+
+        function showDashboard() {
+            showScreen('home');
+            updateUserUI();
+        }
+
+        function updateUserUI() {
+            const initial = user?.name?.[0]?.toUpperCase() || 'U';
+            document.getElementById('userAvatar').textContent = initial;
+            document.getElementById('userName').textContent = user?.name || 'User';
+            document.getElementById('settingsAvatar').textContent = initial;
+            document.getElementById('settingsName').textContent = user?.name || 'User';
+            document.getElementById('settingsEmail').textContent = user?.email || '';
+        }
+
+        // Auth Functions
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+            if (tab === 'login') {
+                document.querySelector('.auth-tab:first-child').classList.add('active');
+                document.getElementById('loginForm').classList.add('active');
+            } else {
+                document.querySelector('.auth-tab:last-child').classList.add('active');
+                document.getElementById('registerForm').classList.add('active');
+            }
+        }
+
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            const icon = input.parentElement.querySelector('.input-toggle i');
+            input.type = input.type === 'password' ? 'text' : 'password';
+            icon.classList.toggle('fa-eye');
+            icon.classList.toggle('fa-eye-slash');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const err = document.getElementById('loginError');
+            btn.innerHTML = '<div class="spinner"></div>';
+            btn.disabled = true;
+            err.classList.remove('show');
+
+            try {
+                const res = await fetch(`${API}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: document.getElementById('loginEmail').value,
+                        password: document.getElementById('loginPassword').value
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    token = data.data.access_token;
+                    user = data.data.user;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    toast('Login successful!', 'success');
+                    showDashboard();
+                    loadProjects();
+                } else {
+                    err.querySelector('span').textContent = data.error || 'Login failed';
+                    err.classList.add('show');
+                }
+            } catch (e) {
+                err.querySelector('span').textContent = 'Connection error';
+                err.classList.add('show');
+            }
+            btn.innerHTML = 'Sign In';
+            btn.disabled = false;
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = document.getElementById('registerBtn');
+            const err = document.getElementById('registerError');
+            btn.innerHTML = '<div class="spinner"></div>';
+            btn.disabled = true;
+            err.classList.remove('show');
+
+            try {
+                const res = await fetch(`${API}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('registerName').value,
+                        email: document.getElementById('registerEmail').value,
+                        password: document.getElementById('registerPassword').value
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    token = data.data.access_token;
+                    user = data.data.user;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    toast('Account created!', 'success');
+                    showDashboard();
+                } else {
+                    err.querySelector('span').textContent = data.error || 'Registration failed';
+                    err.classList.add('show');
+                }
+            } catch (e) {
+                err.querySelector('span').textContent = 'Connection error';
+                err.classList.add('show');
+            }
+            btn.innerHTML = 'Create Account';
+            btn.disabled = false;
+        }
+
+        function handleLogout() {
+            localStorage.clear();
+            token = null;
+            user = null;
+            projects = [];
+            showScreen('login');
+            toast('Logged out');
+        }
+
+        // QR Scanner
+        function openQRScanner() {
+            document.getElementById('qrModal').classList.add('active');
+            qrScanner = new Html5Qrcode("qr-reader");
+            qrScanner.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 240, height: 240 } },
+                onQRCodeScanned,
+                () => {}
+            ).catch(() => {
+                toast('Camera access denied', 'error');
+                closeQRScanner();
+            });
+        }
+
+        function closeQRScanner() {
+            if (qrScanner) {
+                qrScanner.stop().catch(() => {});
+                qrScanner = null;
+            }
+            document.getElementById('qrModal').classList.remove('active');
+        }
+
+        async function onQRCodeScanned(text) {
+            if (!text.startsWith('reelsense:')) return;
+            closeQRScanner();
+            try {
+                const res = await fetch(`${API}/auth/qr-login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ qr_token: text.replace('reelsense:', '') })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    token = data.data.access_token;
+                    user = data.data.user;
+                    localStorage.setItem('token', token);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    toast('QR login successful!', 'success');
+                    showDashboard();
+                    loadProjects();
+                } else {
+                    toast(data.error || 'QR login failed', 'error');
+                }
+            } catch (e) {
+                toast('Connection error', 'error');
+            }
+        }
+
+        // Projects
+        async function loadProjects() {
+            // Load from localStorage for now (backend doesn't have project listing yet)
+            const saved = localStorage.getItem('projects');
+            if (saved) {
+                projects = JSON.parse(saved);
+            }
+            renderProjects();
+            updateStats();
+        }
+
+        function saveProjectsToStorage() {
+            localStorage.setItem('projects', JSON.stringify(projects));
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('projectsList');
+            if (projects.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-film"></i></div>
+                        <div class="empty-title">No projects yet</div>
+                        <div class="empty-text">Create your first video to get started</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const recent = projects.slice(0, 3);
+            container.innerHTML = recent.map(p => projectItemHTML(p)).join('');
+        }
+
+        function renderAllProjects() {
+            const container = document.getElementById('allProjectsList');
+            if (projects.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon"><i class="fas fa-folder-open"></i></div>
+                        <div class="empty-title">No projects found</div>
+                        <div class="empty-text">Your video projects will appear here</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = projects.map(p => `<div class="card">${projectItemHTML(p)}</div>`).join('');
+        }
+
+        function projectItemHTML(p) {
+            const statusClass = p.status === 'completed' ? 'done' : p.status === 'failed' ? 'failed' : 'processing';
+            const statusText = p.status === 'completed' ? 'Done' : p.status === 'failed' ? 'Failed' : 'Processing';
+            const date = new Date(p.created).toLocaleDateString();
+            return `
+                <div class="project-item" onclick="openProject('${p.projectId}')">
+                    <div class="project-thumb"><i class="fas fa-play"></i></div>
+                    <div class="project-info">
+                        <div class="project-title">${p.topic || 'Untitled'}</div>
+                        <div class="project-meta">
+                            <span class="project-date">${date}</span>
+                            <span class="project-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                    <i class="fas fa-chevron-right project-arrow"></i>
+                </div>
+            `;
+        }
+
+        function updateStats() {
+            const completed = projects.filter(p => p.status === 'completed').length;
+            const totalDuration = projects.reduce((sum, p) => sum + (p.duration || 0), 0);
+            document.getElementById('statVideos').textContent = completed;
+            document.getElementById('statTime').textContent = Math.round(totalDuration / 60) + 'm';
+        }
+
+        function openProject(projectId) {
+            const project = projects.find(p => p.projectId === projectId);
+            if (project && project.videoUrl) {
+                document.getElementById('modalVideo').src = project.videoUrl;
+                document.getElementById('videoModal').classList.add('active');
+                currentProject = project;
+            } else {
+                toast('Video not ready yet', 'error');
+            }
+        }
+
+        function closeVideoModal() {
+            document.getElementById('videoModal').classList.remove('active');
+            document.getElementById('modalVideo').pause();
+        }
+
+        // Create Video Flow
+        function startCreateVideo() {
+            currentProject = {
+                projectId: 'proj_' + Date.now(),
+                topic: '',
+                brand: '',
+                reelType: 'ai-generated',
+                duration: 15,
+                scriptLength: 'medium',
+                tone: 'professional',
+                script: '',
+                status: 'draft',
+                created: new Date().toISOString()
+            };
+            currentStage = 1;
+            updateStageUI();
+            showScreen('create');
+        }
+
+        function exitCreateVideo() {
+            if (currentProject && currentProject.status !== 'completed') {
+                if (confirm('Exit without saving? Your progress may be lost.')) {
+                    showScreen('home');
+                }
+            } else {
+                showScreen('home');
+            }
+        }
+
+        function updateStageUI() {
+            // Update progress steps
+            for (let i = 1; i <= 5; i++) {
+                const step = document.getElementById(`step${i}`);
+                step.classList.remove('active', 'done');
+                if (i < currentStage) step.classList.add('done');
+                if (i === currentStage) step.classList.add('active');
+            }
+
+            // Update stage info
+            const stageNames = ['Define', 'Script', 'Generate', 'Edit', 'Publish'];
+            document.getElementById('stageNumber').textContent = `Stage ${currentStage} of 5`;
+            document.getElementById('stageName').textContent = stageNames[currentStage - 1];
+
+            // Show/hide stages
+            for (let i = 1; i <= 5; i++) {
+                document.getElementById(`stage${i}`).classList.remove('active');
+            }
+            document.getElementById(`stage${currentStage}`).classList.add('active');
+
+            // Update buttons
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            prevBtn.style.display = currentStage > 1 ? 'flex' : 'none';
+
+            if (currentStage === 2 && !currentProject.script) {
+                nextBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Script';
+            } else if (currentStage === 3 && !currentProject.videoUrl) {
+                nextBtn.innerHTML = '<i class="fas fa-video"></i> Generate Video';
+            } else if (currentStage === 5) {
+                nextBtn.innerHTML = '<i class="fas fa-check"></i> Finish';
+            } else {
+                nextBtn.innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
+            }
+        }
+
+        function selectOption(el, type) {
+            el.parentElement.querySelectorAll('.select-option').forEach(o => o.classList.remove('active'));
+            el.classList.add('active');
+            currentProject[type] = el.dataset.value;
+        }
+
+        function selectDuration(el) {
+            el.parentElement.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            currentProject.duration = parseInt(el.dataset.value);
+        }
+
+        function selectScriptLength(el) {
+            el.parentElement.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            currentProject.scriptLength = el.dataset.value;
+        }
+
+        function selectTone(el) {
+            el.parentElement.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            currentProject.tone = el.dataset.value;
+        }
+
+        async function nextStage() {
+            if (currentStage === 1) {
+                currentProject.topic = document.getElementById('topicInput').value;
+                currentProject.brand = document.getElementById('brandInput').value;
+                if (!currentProject.topic) {
+                    toast('Please enter a topic', 'error');
+                    return;
+                }
+            }
+
+            if (currentStage === 2 && !currentProject.script) {
+                await generateScript();
+                return;
+            }
+
+            if (currentStage === 3 && !currentProject.videoUrl) {
+                await generateVideo();
+                return;
+            }
+
+            if (currentStage === 5) {
+                finishProject();
+                return;
+            }
+
+            currentStage++;
+            updateStageUI();
+
+            // Load video into edit/final stages
+            if (currentStage === 4 && currentProject.videoUrl) {
+                document.getElementById('editVideo').src = currentProject.videoUrl;
+            }
+            if (currentStage === 5 && currentProject.videoUrl) {
+                document.getElementById('finalVideo').src = currentProject.videoUrl;
+            }
+        }
+
+        function prevStage() {
+            if (currentStage > 1) {
+                currentStage--;
+                updateStageUI();
+            }
+        }
+
+        async function generateScript() {
+            const nextBtn = document.getElementById('nextBtn');
+            nextBtn.disabled = true;
+            document.getElementById('scriptLoading').style.display = 'block';
+            document.getElementById('scriptPreviewContainer').style.display = 'none';
+
+            try {
+                const res = await fetch(`${API}/generate-script`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        topic: currentProject.topic,
+                        brand: currentProject.brand,
+                        duration: currentProject.duration,
+                        length: currentProject.scriptLength,
+                        tone: currentProject.tone
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    currentProject.script = data.data.script;
+                    currentProject.projectId = data.data.projectId || currentProject.projectId;
+                    document.getElementById('scriptText').textContent = data.data.script;
+                    document.getElementById('wordCount').textContent = data.data.wordCount || 0;
+                    document.getElementById('estDuration').textContent = Math.round(data.data.estimatedDuration || currentProject.duration);
+                    document.getElementById('scriptPreviewContainer').style.display = 'block';
+                    toast('Script generated!', 'success');
+                    nextBtn.innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
+                } else {
+                    toast(data.error || 'Failed to generate script', 'error');
+                }
+            } catch (e) {
+                toast('Connection error', 'error');
+            }
+
+            document.getElementById('scriptLoading').style.display = 'none';
+            nextBtn.disabled = false;
+        }
+
+        async function generateVideo() {
+            const nextBtn = document.getElementById('nextBtn');
+            nextBtn.disabled = true;
+            document.getElementById('videoGenerating').style.display = 'block';
+            document.getElementById('videoPreviewContainer').style.display = 'none';
+
+            try {
+                const res = await fetch(`${API}/generate-video`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        script: currentProject.script,
+                        projectId: currentProject.projectId,
+                        duration: currentProject.duration,
+                        reelType: currentProject.reelType
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    videoJobId = data.data.jobId;
+                    currentProject.jobId = videoJobId;
+                    pollVideoStatus();
+                } else {
+                    toast(data.error || 'Failed to start video generation', 'error');
+                    nextBtn.disabled = false;
+                }
+            } catch (e) {
+                toast('Connection error', 'error');
+                nextBtn.disabled = false;
+            }
+        }
+
+        function pollVideoStatus() {
+            updateVideoProgress(0, 'Starting generation...');
+
+            pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`${API}/video-status/${videoJobId}?projectId=${currentProject.projectId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+
+                    if (data.status === 'success') {
+                        const progress = data.data.progress || 0;
+                        const status = data.data.status;
+
+                        updateVideoProgress(progress, getStatusText(status, progress));
+
+                        if (status === 'completed' && data.data.videoUrl) {
+                            clearInterval(pollInterval);
+                            currentProject.videoUrl = data.data.videoUrl;
+                            currentProject.status = 'completed';
+                            document.getElementById('generatedVideo').src = data.data.videoUrl;
+                            document.getElementById('videoPreviewContainer').style.display = 'block';
+                            document.getElementById('videoGenerating').style.display = 'none';
+                            document.getElementById('nextBtn').disabled = false;
+                            document.getElementById('nextBtn').innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
+                            toast('Video generated!', 'success');
+
+                            // Try to compose video with audio
+                            composeVideo();
+                        } else if (status === 'failed') {
+                            clearInterval(pollInterval);
+                            currentProject.status = 'failed';
+                            toast('Video generation failed', 'error');
+                            document.getElementById('nextBtn').disabled = false;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Poll error:', e);
+                }
+            }, 3000);
+        }
+
+        function updateVideoProgress(progress, text) {
+            document.getElementById('videoProgressCircle').style.setProperty('--progress', `${progress}%`);
+            document.getElementById('videoProgressValue').textContent = `${progress}%`;
+            document.getElementById('videoProgressLabel').textContent = text;
+        }
+
+        function getStatusText(status, progress) {
+            if (status === 'processing') {
+                if (progress < 30) return 'Analyzing script...';
+                if (progress < 60) return 'Generating scenes...';
+                if (progress < 90) return 'Rendering video...';
+                return 'Finalizing...';
+            }
+            return status.charAt(0).toUpperCase() + status.slice(1);
+        }
+
+        async function composeVideo() {
+            try {
+                const res = await fetch(`${API}/compose-video`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        projectId: currentProject.projectId
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success' && data.data.videoUrl) {
+                    currentProject.videoUrl = window.location.origin + data.data.videoUrl;
+                }
+            } catch (e) {
+                console.error('Compose error:', e);
+            }
+        }
+
+        async function addCaptions() {
+            toast('Adding captions...', 'success');
+            try {
+                const res = await fetch(`${API}/add-captions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        projectId: currentProject.projectId,
+                        script: currentProject.script
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    currentProject.videoUrl = window.location.origin + data.data.videoUrl;
+                    document.getElementById('editVideo').src = currentProject.videoUrl;
+                    toast('Captions added!', 'success');
+                } else {
+                    toast(data.error || 'Failed to add captions', 'error');
+                }
+            } catch (e) {
+                toast('Connection error', 'error');
+            }
+        }
+
+        function regenerateVoiceover() {
+            toast('Voice-over options coming soon!', 'success');
+        }
+
+        function finishProject() {
+            currentProject.status = 'completed';
+
+            // Add to projects list
+            const existingIndex = projects.findIndex(p => p.projectId === currentProject.projectId);
+            if (existingIndex >= 0) {
+                projects[existingIndex] = currentProject;
+            } else {
+                projects.unshift(currentProject);
+            }
+            saveProjectsToStorage();
+
+            toast('Project saved!', 'success');
+            showScreen('home');
+            loadProjects();
+        }
+
+        function saveProject() {
+            currentProject.topic = document.getElementById('topicInput').value || currentProject.topic;
+            currentProject.brand = document.getElementById('brandInput').value || currentProject.brand;
+
+            const existingIndex = projects.findIndex(p => p.projectId === currentProject.projectId);
+            if (existingIndex >= 0) {
+                projects[existingIndex] = currentProject;
+            } else {
+                projects.unshift(currentProject);
+            }
+            saveProjectsToStorage();
+            toast('Project saved!', 'success');
+        }
+
+        function downloadVideo() {
+            if (currentProject && currentProject.videoUrl) {
+                window.open(`${API}/download/${currentProject.projectId}?format=mp4`, '_blank');
+            } else {
+                toast('No video to download', 'error');
+            }
+        }
+
+        function downloadCurrentVideo() {
+            if (currentProject && currentProject.videoUrl) {
+                window.open(`${API}/download/${currentProject.projectId}?format=mp4`, '_blank');
+            }
+        }
+
+        function shareVideo() {
+            if (currentProject && currentProject.videoUrl) {
+                if (navigator.share) {
+                    navigator.share({
+                        title: currentProject.topic || 'My Reel Sense Video',
+                        text: 'Check out my AI-generated video!',
+                        url: currentProject.videoUrl
+                    });
+                } else {
+                    navigator.clipboard.writeText(currentProject.videoUrl);
+                    toast('Link copied to clipboard!', 'success');
+                }
+            }
+        }
+
+        function shareCurrentVideo() {
+            shareVideo();
+        }
+
+        // Toast
+        function toast(message, type = 'success') {
+            const t = document.getElementById('toast');
+            t.querySelector('span').textContent = message;
+            t.querySelector('i').className = type === 'error' ? 'fas fa-exclamation-circle' : 'fas fa-check-circle';
+            t.className = `toast ${type} show`;
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>

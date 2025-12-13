@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Login or Register - Reel Sense AI Video Generator">
+    <title>Login | Reel Sense - AI Video Generator</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Sans+Pro:wght@300;400;600;700&family=Fjalla+One&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Auth Styles -->
+    <link rel="stylesheet" href="css/auth.css?v=8.0">
+
+    <!-- Config -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js?v=4.0" defer></script>
+</head>
+<body>
+    <!-- Main Auth Container -->
+    <main class="auth-page">
+        <!-- Logo Header -->
+        <div class="auth-header">
+            <div class="logo">
+                <div class="logo-ring">
+                    <svg viewBox="0 0 50 50" width="40" height="40">
+                        <!-- Connection lines -->
+                        <line x1="25" y1="5" x2="45" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="45" y1="20" x2="40" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="40" y1="42" x2="10" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="10" y1="42" x2="5" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="5" y1="20" x2="25" y2="5" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <!-- Inner connections -->
+                        <line x1="25" y1="5" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="5" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <line x1="45" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                        <!-- Colored dots -->
+                        <circle cx="25" cy="5" r="4" fill="#c73e1d"/>
+                        <circle cx="45" cy="20" r="4" fill="#f4a127"/>
+                        <circle cx="40" cy="42" r="4" fill="#826c6c"/>
+                        <circle cx="10" cy="42" r="4" fill="#3d2314"/>
+                        <circle cx="5" cy="20" r="4" fill="#d4a84b"/>
+                        <circle cx="25" cy="28" r="3" fill="#a8948f"/>
+                    </svg>
+                </div>
+                <span class="logo-text">REEL<span class="logo-accent">SENSE</span></span>
+            </div>
+            <p class="tagline">TAILORED. TRUSTED. TRANSFORMATIVE.</p>
+        </div>
+
+        <!-- Auth Card -->
+        <div class="auth-card">
+            <!-- Tab Switcher -->
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign In</button>
+                <button class="auth-tab" data-tab="register">Create Account</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginEmail">EMAIL</label>
+                    <input type="email" id="loginEmail" name="email" placeholder="you@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPassword">PASSWORD</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="loginPassword" name="password" placeholder="Enter password" required>
+                        <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="forgot-link" onclick="showForgotPassword(); return false;">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    SIGN IN
+                </button>
+
+                <div class="form-divider">
+                    <span>or continue with</span>
+                </div>
+
+                <div class="social-buttons">
+                    <button type="button" class="btn-social" onclick="signInWithGoogle()">
+                        <svg viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                        </svg>
+                        Google
+                    </button>
+                    <button type="button" class="btn-social" onclick="signInWithMicrosoft()">
+                        <svg viewBox="0 0 21 21" width="20" height="20">
+                            <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                            <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                            <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                            <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                        </svg>
+                        Microsoft
+                    </button>
+                </div>
+
+                <div id="loginError" class="error-message hidden"></div>
+                <div id="loginSuccess" class="success-message hidden"></div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form">
+                <!-- Beta Invite Code -->
+                <div class="form-group invite-group" id="inviteCodeGroup">
+                    <label for="inviteCode">
+                        <i class="fas fa-ticket-alt"></i> BETA INVITE CODE
+                    </label>
+                    <input type="text" id="inviteCode" name="invite_code" placeholder="Enter your invite code" style="text-transform: uppercase;">
+                    <p class="hint-text">Don't have a code? Contact admin for beta access.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerName">FULL NAME</label>
+                    <input type="text" id="registerName" name="name" placeholder="John Doe" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerEmail">EMAIL</label>
+                    <input type="email" id="registerEmail" name="email" placeholder="you@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerPassword">PASSWORD</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="registerPassword" name="password" placeholder="Min. 8 characters" required minlength="8">
+                        <button type="button" class="password-toggle" onclick="togglePassword('registerPassword')" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="password-strength" id="passwordStrength"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">CONFIRM PASSWORD</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required>
+                </div>
+
+                <div class="form-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agreeTerms" required>
+                        <span>I agree to the <a href="#">Terms</a> and <a href="#">Privacy Policy</a></span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn-submit">
+                    CREATE ACCOUNT
+                </button>
+
+                <div id="registerError" class="error-message hidden"></div>
+                <div id="registerSuccess" class="success-message hidden"></div>
+            </form>
+
+            <!-- API Key Display -->
+            <div id="apiKeySection" class="api-key-section hidden">
+                <h3><i class="fas fa-key"></i> Your API Key</h3>
+                <p>Use this key for API access:</p>
+                <div class="api-key-display">
+                    <code id="apiKeyValue">rsk_xxxxxxxxxxxx</code>
+                    <button type="button" onclick="copyApiKey()" title="Copy API Key">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <p class="api-key-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Keep this key secret. Don't share it publicly.
+                </p>
+                <a href="/" class="btn-submit">
+                    Go to Dashboard <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <!-- Forgot Password -->
+            <div id="forgotPasswordSection" class="auth-form hidden">
+                <h2>Reset Password</h2>
+                <p class="form-subtitle">Enter your email to receive a reset link</p>
+
+                <div class="form-group">
+                    <label for="forgotEmail">EMAIL</label>
+                    <input type="email" id="forgotEmail" name="email" placeholder="you@example.com" required>
+                </div>
+
+                <button type="button" class="btn-submit" onclick="requestPasswordReset()">
+                    SEND RESET LINK
+                </button>
+
+                <div id="forgotError" class="error-message hidden"></div>
+                <div id="forgotSuccess" class="success-message hidden"></div>
+
+                <p class="back-link">
+                    <a href="#" onclick="backToLogin(); return false;">
+                        <i class="fas fa-arrow-left"></i> Back to Sign In
+                    </a>
+                </p>
+            </div>
+
+            <!-- Reset Password Form -->
+            <div id="resetPasswordSection" class="auth-form hidden">
+                <h2>Set New Password</h2>
+                <p class="form-subtitle">Enter your new password below</p>
+                <p id="resetEmailDisplay" class="reset-email"></p>
+
+                <div class="form-group">
+                    <label for="newPassword">NEW PASSWORD</label>
+                    <div class="input-with-toggle">
+                        <input type="password" id="newPassword" name="new_password" placeholder="Min. 8 characters" required minlength="8">
+                        <button type="button" class="password-toggle" onclick="togglePassword('newPassword')" aria-label="Toggle password visibility">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmNewPassword">CONFIRM PASSWORD</label>
+                    <input type="password" id="confirmNewPassword" name="confirm_new_password" placeholder="Confirm new password" required>
+                </div>
+
+                <button type="button" class="btn-submit" onclick="submitPasswordReset()">
+                    RESET PASSWORD
+                </button>
+
+                <div id="resetError" class="error-message hidden"></div>
+                <div id="resetSuccess" class="success-message hidden"></div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="auth-footer">
+            <p>&copy; 2025 Reel Sense by <a href="https://contentsense.ai">ContentSense.ai</a></p>
+        </div>
+    </main>
+</body>
+</html>

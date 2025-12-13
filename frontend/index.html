@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-Powered Video Ad Generator - Create professional video ads in minutes">
+    <title>Reel Sense - AI Video Ad Generator | Professional Reel Creation</title>
+
+    <!-- Fonts - Matching ContestSense.ai -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&family=Fjalla+One&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css?v=101.0">
+
+    <!-- Configuration (load before other scripts) -->
+    <script src="js/config.js?v=3.0"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <svg class="brand-ring" viewBox="0 0 50 50" width="36" height="36">
+                    <!-- Connection lines -->
+                    <line x1="25" y1="5" x2="45" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="45" y1="20" x2="40" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="40" y1="42" x2="10" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="10" y1="42" x2="5" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="5" y1="20" x2="25" y2="5" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <!-- Inner connections -->
+                    <line x1="25" y1="5" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="5" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="45" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <!-- Colored dots -->
+                    <circle cx="25" cy="5" r="4" fill="#c73e1d"/>
+                    <circle cx="45" cy="20" r="4" fill="#f4a127"/>
+                    <circle cx="40" cy="42" r="4" fill="#826c6c"/>
+                    <circle cx="10" cy="42" r="4" fill="#3d2314"/>
+                    <circle cx="5" cy="20" r="4" fill="#d4a84b"/>
+                    <circle cx="25" cy="28" r="3" fill="#a8948f"/>
+                </svg>
+                <span>Reel Sense</span>
+            </div>
+            <div class="nav-menu">
+                <a href="#home" class="nav-link active">Home</a>
+                <button onclick="createNew()" class="nav-link btn-outline" style="border: 1px solid #826c6c; padding: 8px 16px; border-radius: 6px; cursor: pointer; background: transparent; color: #826c6c;">
+                    <i class="fas fa-plus"></i> New Project
+                </button>
+                <a href="#create" class="nav-link btn-primary">Create Video</a>
+                <a href="auth.html" class="nav-link" id="authLink">
+                    <i class="fas fa-user"></i> Sign In
+                </a>
+            </div>
+            <button class="mobile-toggle" id="mobileToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <!-- Animated Particles Background -->
+        <div class="hero-particles">
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+            <div class="particle"></div>
+        </div>
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1 class="hero-title">
+                        Create <span class="accent-text">Professional</span><br>
+                        <span class="accent-text">Video Ads</span><br>
+                        in Minutes with AI
+                    </h1>
+                    <p class="hero-subtitle">
+                        Transform your ideas into stunning video reels with AI-powered script generation,
+                        voice-overs, and video synthesis. No editing skills required.
+                    </p>
+                    <div class="hero-cta">
+                        <button class="btn btn-primary btn-large" onclick="scrollToGenerator()">
+                            <i class="fas fa-rocket"></i> Start Creating Now
+                        </button>
+                        <button class="btn btn-secondary btn-large" onclick="openSampleVideoModal()">
+                            <i class="fas fa-play-circle"></i> View Sample Video
+                        </button>
+                    </div>
+                    <!-- Trust Indicators -->
+                    <div class="trust-indicators">
+                        <div class="trust-item">
+                            <div class="trust-icon pulse-green">
+                                <i class="fas fa-circle"></i>
+                            </div>
+                            <span><strong id="liveUsers">127</strong> creators online now</span>
+                        </div>
+                        <div class="trust-item">
+                            <div class="trust-icon">
+                                <i class="fas fa-video"></i>
+                            </div>
+                            <span><strong id="totalVideos">52,847</strong> videos created</span>
+                        </div>
+                    </div>
+
+                    <!-- Live Activity Feed -->
+                    <div class="live-activity">
+                        <div class="activity-header">
+                            <span class="live-dot"></span>
+                            <span>Live Activity</span>
+                        </div>
+                        <div class="activity-feed" id="activityFeed">
+                            <div class="activity-item">
+                                <div class="activity-avatar">S</div>
+                                <span><strong>Sarah M.</strong> started editing a product demo</span>
+                                <span class="activity-time">2s ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <!-- Desktop/Tablet: Phone Mockup (hidden on mobile) -->
+                    <div class="mockup-container desktop-only">
+                        <div class="phone-mockup">
+                            <div class="phone-screen">
+                                <!-- Sample Video in Phone Mockup -->
+                                <video
+                                    class="phone-sample-video"
+                                    autoplay
+                                    muted
+                                    loop
+                                    playsinline
+                                    poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='533'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23826c6c;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%233d2314;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='533' fill='url(%23grad)'/%3E%3Ctext x='150' y='260' text-anchor='middle' fill='white' font-size='14' font-family='sans-serif'%3EVideo Demo%3C/text%3E%3Ctext x='150' y='285' text-anchor='middle' fill='rgba(255,255,255,0.7)' font-size='11' font-family='sans-serif'%3EClick to preview%3C/text%3E%3C/svg%3E"
+                                >
+                                    <!-- Local sample video -->
+                                    <source src="/sample_demo.mp4" type="video/mp4">
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        </div>
+                        <div class="floating-card card-1">
+                            <i class="fas fa-wand-magic-sparkles"></i>
+                            <span>AI Script Generation</span>
+                        </div>
+                        <div class="floating-card card-2">
+                            <i class="fas fa-microphone"></i>
+                            <span>Natural Voice-Over</span>
+                        </div>
+                        <div class="floating-card card-3">
+                            <i class="fas fa-film"></i>
+                            <span>HD Video Output</span>
+                        </div>
+                    </div>
+
+                    <!-- Mobile: Demo Video + Feature Cards (shown only on mobile) -->
+                    <div class="mobile-hero-content mobile-only">
+                        <!-- Demo Video Preview -->
+                        <div class="mobile-video-preview">
+                            <video
+                                class="mobile-sample-video"
+                                controls
+                                playsinline
+                                preload="metadata"
+                                poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='533'%3E%3Cdefs%3E%3ClinearGradient id='grad' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23667eea;stop-opacity:1'/%3E%3Cstop offset='100%25' style='stop-color:%23764ba2;stop-opacity:1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='300' height='533' fill='url(%23grad)'/%3E%3Ctext x='50%25' y='45%25' text-anchor='middle' fill='white' font-size='28' font-weight='bold'%3EAI Sample Video%3C/text%3E%3Ctext x='50%25' y='55%25' text-anchor='middle' fill='rgba(255,255,255,0.8)' font-size='18'%3ETap to Play%3C/text%3E%3Ccircle cx='150' cy='300' r='40' fill='rgba(255,255,255,0.3)' /%3E%3Cpolygon points='140,285 140,315 165,300' fill='white' /%3E%3C/svg%3E"
+                            >
+                                <!-- Local sample video -->
+                                <source src="/sample_demo.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+
+                        <!-- Mobile Feature Cards -->
+                        <div class="mobile-features-grid">
+                            <div class="mobile-feature-card">
+                                <div class="feature-icon">
+                                    <i class="fas fa-wand-magic-sparkles"></i>
+                                </div>
+                                <div class="feature-text">
+                                    <h4>AI Script Generation</h4>
+                                    <p>Auto-generate engaging scripts</p>
+                                </div>
+                            </div>
+                            <div class="mobile-feature-card">
+                                <div class="feature-icon">
+                                    <i class="fas fa-bolt"></i>
+                                </div>
+                                <div class="feature-text">
+                                    <h4>2-3 Min Creation</h4>
+                                    <p>Fast video generation</p>
+                                </div>
+                            </div>
+                            <div class="mobile-feature-card">
+                                <div class="feature-icon">
+                                    <i class="fas fa-film"></i>
+                                </div>
+                                <div class="feature-text">
+                                    <h4>HD Video Output</h4>
+                                    <p>Professional quality</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Scroll Indicator -->
+        <div class="scroll-indicator">
+            <span>Scroll</span>
+            <i class="fas fa-chevron-down"></i>
+        </div>
+    </section>
+
+    <!-- Features Section - What It Does -->
+    <section class="stats-section">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-file-video"></i></div>
+                    <div class="stat-number">Script to Video</div>
+                    <div class="stat-label">Paste text, get a reel</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-bolt"></i></div>
+                    <div class="stat-number">2-3 Min</div>
+                    <div class="stat-label">Fast Generation</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-microphone-alt"></i></div>
+                    <div class="stat-number">AI Voice-Over</div>
+                    <div class="stat-label">Natural narration</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-mobile-alt"></i></div>
+                    <div class="stat-number">HD Ready</div>
+                    <div class="stat-label">Share anywhere</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Video Generator Section -->
+    <section class="generator" id="create">
+        <div class="container">
+            <div class="section-header">
+                <h2>Create Your Video Ad</h2>
+                <p>Follow the steps below to generate your professional video reel</p>
+            </div>
+
+            <!-- Progress Steps -->
+            <div class="progress-steps">
+                <div class="step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Prompt</div>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Script</div>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Video</div>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" data-step="4">
+                    <div class="step-number">4</div>
+                    <div class="step-label">Edit</div>
+                </div>
+                <div class="step-line"></div>
+                <div class="step" data-step="5">
+                    <div class="step-number">5</div>
+                    <div class="step-label">Publish</div>
+                </div>
+            </div>
+
+            <!-- Stage 1: Prompt -->
+            <div class="stage-container active" id="stage1">
+                <div class="stage-card">
+                    <div class="stage-header">
+                        <h3><i class="fas fa-lightbulb"></i> Stage 1: Define Your Video</h3>
+                        <p>Tell us about the video you want to create</p>
+                    </div>
+                    <div class="stage-body">
+                        <div class="form-container">
+                            <!-- Reel Type -->
+                            <div class="form-group-modern full-width">
+                                <label for="reelType" class="form-label-modern">Reel Type</label>
+                                <div class="select-wrapper">
+                                    <select id="reelType" class="form-control-modern" onchange="toggleImageUpload()">
+                                        <option value="ai-generated" selected>AI Generated (Text to Video)</option>
+                                        <option value="image-to-video">Image to Video</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down select-icon"></i>
+                                </div>
+                            </div>
+
+                            <!-- Image Upload (for Image-to-Video mode) -->
+                            <div id="imageUploadSection" class="form-group-modern full-width" style="display: none;">
+                                <label class="form-label-modern">Source Image <span style="color: #e74c3c;">*</span></label>
+                                <div class="file-upload-wrapper">
+                                    <input type="file" id="sourceImage" class="file-input" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onchange="previewSourceImage(this)">
+                                    <div class="file-upload-display" id="imageUploadDisplay" onclick="document.getElementById('sourceImage').click()" style="cursor: pointer;">
+                                        <i class="fas fa-image"></i>
+                                        <span class="file-upload-text">Click to upload image</span>
+                                        <span class="file-name-display">No file chosen</span>
+                                    </div>
+                                </div>
+                                <div id="imagePreviewContainer" style="display: none; margin-top: 10px; text-align: center;">
+                                    <img id="sourceImagePreview" style="max-width: 200px; max-height: 150px; border-radius: 8px; border: 2px solid #ddd;">
+                                </div>
+                                <small class="form-hint">Upload a clear image to transform into video</small>
+                            </div>
+
+                            <!-- Motion Style (for Image-to-Video mode) -->
+                            <div id="motionStyleSection" class="form-group-modern full-width" style="display: none;">
+                                <label for="motionStyle" class="form-label-modern">Motion Style</label>
+                                <div class="select-wrapper">
+                                    <select id="motionStyle" class="form-control-modern">
+                                        <option value="smooth-zoom">Smooth Zoom In</option>
+                                        <option value="gentle-pan">Gentle Pan</option>
+                                        <option value="dynamic-motion" selected>Dynamic Motion</option>
+                                        <option value="subtle-float">Subtle Float</option>
+                                        <option value="cinematic-reveal">Cinematic Reveal</option>
+                                        <option value="energetic-bounce">Energetic Bounce</option>
+                                        <option value="slow-rotate">Slow Rotation</option>
+                                        <option value="custom">Custom (enter below)</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down select-icon"></i>
+                                </div>
+                                <input type="text" id="customMotionPrompt" class="form-control-modern" placeholder="e.g., camera slowly zooms while particles float" style="display: none; margin-top: 10px;">
+                                <small class="form-hint">Choose how your image should animate</small>
+                            </div>
+
+                            <!-- Duration, Quality & Topic Row -->
+                            <div class="form-row">
+                                <div class="form-group-modern">
+                                    <label for="duration" class="form-label-modern">Duration</label>
+                                    <div class="select-wrapper">
+                                        <select id="duration" class="form-control-modern">
+                                            <option value="5">5 seconds</option>
+                                            <option value="10">10 seconds</option>
+                                            <option value="15">15 seconds</option>
+                                            <option value="30" selected>30 seconds</option>
+                                            <option value="60">1 minute</option>
+                                        </select>
+                                        <i class="fas fa-chevron-down select-icon"></i>
+                                    </div>
+                                </div>
+                                <div class="form-group-modern">
+                                    <label for="videoQuality" class="form-label-modern">Video Quality</label>
+                                    <div class="select-wrapper">
+                                        <select id="videoQuality" class="form-control-modern">
+                                            <option value="480p">480p (Fast ~40s/clip)</option>
+                                            <option value="720p">720p (HD ~2.5min/clip)</option>
+                                            <option value="1080p" selected>1080p (Full HD ~4min/clip)</option>
+                                        </select>
+                                        <i class="fas fa-chevron-down select-icon"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-modern full-width">
+                                    <label for="topic" class="form-label-modern">Topic/Product</label>
+                                    <input type="text" id="topic" class="form-control-modern" placeholder="e.g., KFC Chicken, Nike Shoes">
+                                </div>
+                            </div>
+
+                            <!-- Brand Guidelines -->
+                            <div class="form-group-modern full-width">
+                                <label for="brandGuidelines" class="form-label-modern">Brand Guidelines (Optional)</label>
+                                <div class="file-upload-wrapper">
+                                    <input type="file" id="brandGuidelines" class="file-input" accept=".pdf,.txt,.doc,.docx">
+                                    <div class="file-upload-display">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <span class="file-upload-text">Choose file</span>
+                                        <span class="file-name-display">No file chosen</span>
+                                    </div>
+                                </div>
+                                <small class="form-hint">Upload brand colors, fonts, style guide</small>
+                            </div>
+                        </div>
+
+                        <div class="stage-actions">
+                            <button class="btn btn-primary btn-large btn-next" id="stage1NextBtn" onclick="goToStage(2)">
+                                Next: Generate Script <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 2: Script Generation -->
+            <div class="stage-container" id="stage2">
+                <div class="stage-card">
+                    <div class="stage-header">
+                        <h3><i class="fas fa-file-lines"></i> Stage 2: AI Script Generation</h3>
+                    </div>
+                    <div class="stage-body">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="scriptLength">Script Length</label>
+                                <select id="scriptLength" class="form-control">
+                                    <option value="short">Short (50-75 words)</option>
+                                    <option value="medium" selected>Medium (75-125 words)</option>
+                                    <option value="long">Long (125-200 words)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="tone">Tone</label>
+                                <select id="tone" class="form-control">
+                                    <option value="funny">Funny</option>
+                                    <option value="serious">Serious</option>
+                                    <option value="witty" selected>Witty</option>
+                                    <option value="sarcastic">Sarcastic</option>
+                                    <option value="professional">Professional</option>
+                                </select>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="scriptPreview">Generated Script</label>
+                                <textarea id="scriptPreview" class="form-control script-editor" rows="8" placeholder="Click 'Generate Script' to create AI-powered script..."></textarea>
+                            </div>
+                            <div class="form-group full-width">
+                                <div class="button-group">
+                                    <button class="btn btn-secondary" onclick="generateScript()">
+                                        <i class="fas fa-sparkles"></i> Generate Script
+                                    </button>
+                                    <button class="btn btn-outline" onclick="regenerateScript()">
+                                        <i class="fas fa-rotate"></i> Regenerate
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-actions">
+                            <button class="btn btn-outline" onclick="goToStage(1)">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-primary" onclick="goToStage(3)">
+                                Next: Generate Video <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 3: Video Generation -->
+            <div class="stage-container" id="stage3">
+                <div class="stage-card">
+                    <div class="stage-header">
+                        <h3><i class="fas fa-film"></i> Stage 3: Video Generation</h3>
+                    </div>
+                    <div class="stage-body">
+                        <!-- Script Preview from Stage 2 -->
+                        <div class="form-section" id="visualPromptSection">
+                            <div class="form-group full-width">
+                                <label for="scriptPreviewReadonly">
+                                    <i class="fas fa-file-lines"></i> Your Script
+                                </label>
+                                <div id="scriptPreviewReadonly" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; font-size: 0.95rem; line-height: 1.6; color: #334155; max-height: 120px; overflow-y: auto;"></div>
+                            </div>
+                            <!-- Quality Preset -->
+                            <div class="form-group" style="margin-top: 1.5rem;">
+                                <label for="qualityPreset"><i class="fas fa-sliders"></i> Quality</label>
+                                <select id="qualityPreset" class="form-control">
+                                    <option value="fast">Fast (~3 min)</option>
+                                    <option value="standard" selected>Standard (~5 min)</option>
+                                    <option value="high">High Quality (~8 min)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Generation Progress - Enhanced for Production -->
+                        <div class="generation-progress" id="generationProgress" style="display:none;">
+                            <div class="progress-item">
+                                <div class="progress-icon" id="progressIcon">
+                                    <i class="fas fa-video fa-pulse"></i>
+                                </div>
+                                <div class="progress-content">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                        <div class="progress-label" id="progressLabel">Generating AI video with Replicate...</div>
+                                        <div class="progress-percentage" id="progressPercentage" style="font-weight: 600; color: var(--primary); font-size: 1.1rem;">
+                                            0%
+                                        </div>
+                                    </div>
+                                    <div class="progress-bar" style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative;">
+                                        <div class="progress-fill" id="progressFill" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), #a8948f); transition: width 0.5s ease-in-out; box-shadow: 0 0 10px rgba(130, 108, 108, 0.5);"></div>
+                                        <div class="progress-shimmer" style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent); animation: shimmer 2s infinite;"></div>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                                        <div class="progress-status" id="progressStatus" style="font-size: 0.9rem; color: #666;">
+                                            <i class="fas fa-clock"></i> Initializing...
+                                        </div>
+                                        <div class="progress-time" id="progressTime" style="font-size: 0.85rem; color: #888;">
+                                            Est: 5-7 minutes
+                                        </div>
+                                    </div>
+                                    <div class="progress-details" style="font-size: 0.85rem; color: #888; margin-top: 0.75rem; padding: 0.75rem; background: #f8f9fa; border-radius: 4px; border-left: 3px solid var(--primary);">
+                                        <i class="fas fa-info-circle"></i> Replicate AI is generating your video with professional visuals and synchronized audio. This usually takes 5-7 minutes.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Video Preview (shows after generation) -->
+                        <div class="video-preview-section" id="stage3VideoPreview" style="display: none; margin-top: 2rem;">
+                            <div class="form-section">
+                                <h4 style="margin-bottom: 1rem; color: var(--primary);">
+                                    <i class="fas fa-check-circle"></i> Video Generated Successfully!
+                                </h4>
+                                <div class="video-preview" style="background: #000; border-radius: 12px; overflow: hidden; max-width: 100%; aspect-ratio: 9/16; margin: 0 auto;">
+                                    <video id="stage3PreviewVideo" controls style="width: 100%; height: 100%; object-fit: contain;">
+                                        <source src="" type="video/mp4">
+                                    </video>
+                                </div>
+                                <p style="text-align: center; margin-top: 1rem; color: #666; font-size: 0.9rem;">
+                                    <i class="fas fa-info-circle"></i> Preview your video above, then click "Next" to edit & publish
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Credit Cost Display -->
+                        <div class="credit-cost-display" id="creditCostDisplay" style="text-align: center; margin-bottom: 1rem; padding: 0.75rem; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border: 1px solid #dee2e6;">
+                            <span style="color: #495057; font-size: 0.9rem;">
+                                <i class="fas fa-coins" style="color: #f59e0b;"></i>
+                                Cost: <strong id="videoCreditCost">5</strong> credits
+                                <span style="color: #6c757d; margin-left: 0.5rem;">|</span>
+                                <span style="margin-left: 0.5rem;">Balance: <strong id="userCreditBalance">--</strong></span>
+                            </span>
+                        </div>
+
+                        <div class="stage-actions">
+                            <button class="btn btn-outline" onclick="goToStage(2)">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-primary" id="generateBtn" onclick="startGeneration()">
+                                <i class="fas fa-play"></i> Generate Video
+                            </button>
+                            <button class="btn btn-primary" id="stage3NextBtn" onclick="goToStage(4)" style="display: none;">
+                                Next: Edit <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 4: Edit -->
+            <div class="stage-container" id="stage4">
+                <div class="stage-card">
+                    <div class="stage-header">
+                        <h3><i class="fas fa-scissors"></i> Stage 4: Edit & Refine</h3>
+                        <p>Fine-tune your video</p>
+                    </div>
+                    <div class="stage-body">
+                        <div class="video-editor">
+                            <div class="video-preview">
+                                <video id="previewVideo" controls>
+                                    <source src="" type="video/mp4">
+                                </video>
+                            </div>
+                            <div class="editor-controls">
+                                <button class="btn btn-outline" onclick="addCaptions()">
+                                    <i class="fas fa-closed-captioning"></i> Add Captions
+                                </button>
+                                <div class="editor-note" style="font-size: 0.9rem; color: #888; margin-top: 1rem;">
+                                    <i class="fas fa-info-circle"></i> This video was generated by Replicate AI with integrated audio. You can add captions for accessibility.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="stage-actions">
+                            <button class="btn btn-outline" onclick="goToStage(3)">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-primary" onclick="goToStage(5)">
+                                Next: Publish <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stage 5: Publish -->
+            <div class="stage-container" id="stage5">
+                <div class="stage-card">
+                    <div class="stage-header">
+                        <h3><i class="fas fa-cloud-arrow-up"></i> Stage 5: Publish & Share</h3>
+                        <p>Download or share directly to social media</p>
+                    </div>
+                    <div class="stage-body">
+                        <div class="publish-options">
+                            <button class="publish-card" onclick="downloadVideo('mp4')">
+                                <i class="fas fa-download"></i>
+                                <span>Download MP4</span>
+                            </button>
+                            <button class="publish-card" onclick="viewVideo()">
+                                <i class="fas fa-play-circle"></i>
+                                <span>View in Browser</span>
+                            </button>
+                            <button class="publish-card" onclick="shareVideo('copy')">
+                                <i class="fas fa-link"></i>
+                                <span>Copy Link</span>
+                            </button>
+                        </div>
+                        <div class="stage-actions">
+                            <button class="btn btn-outline" onclick="goToStage(4)">
+                                <i class="fas fa-arrow-left"></i> Back
+                            </button>
+                            <button class="btn btn-success" onclick="createNew()">
+                                <i class="fas fa-plus"></i> Create New Video
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-simple">
+                <div class="footer-brand-simple">
+                    <div class="brand-logo">
+                        <svg class="brand-ring" viewBox="0 0 50 50" width="28" height="28">
+                            <!-- Connection lines -->
+                            <line x1="25" y1="5" x2="45" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="45" y1="20" x2="40" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="40" y1="42" x2="10" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="10" y1="42" x2="5" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="5" y1="20" x2="25" y2="5" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <!-- Inner connections -->
+                            <line x1="25" y1="5" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="5" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <line x1="45" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                            <!-- Colored dots -->
+                            <circle cx="25" cy="5" r="4" fill="#c73e1d"/>
+                            <circle cx="45" cy="20" r="4" fill="#f4a127"/>
+                            <circle cx="40" cy="42" r="4" fill="#826c6c"/>
+                            <circle cx="10" cy="42" r="4" fill="#3d2314"/>
+                            <circle cx="5" cy="20" r="4" fill="#d4a84b"/>
+                            <circle cx="25" cy="28" r="3" fill="#a8948f"/>
+                        </svg>
+                        <span>Reel Sense</span>
+                    </div>
+                    <p class="tagline" style="font-style: italic; color: #826c6c; margin-bottom: 0.5rem;">tailored. trusted. transformative.</p>
+                    <p>Professional AI-powered video generation for modern creators.</p>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.75rem;">
+                        <a href="https://contentsense.ai" target="_blank" rel="noopener noreferrer" style="color: #826c6c; text-decoration: none;">
+                            Powered by <strong>ContentSense.ai</strong>
+                        </a>
+                    </p>
+                </div>
+                <div class="footer-social">
+                    <a href="https://twitter.com/reelsense" target="_blank" rel="noopener noreferrer" title="Follow us on Twitter">
+                        <i class="fab fa-twitter"></i>
+                    </a>
+                    <a href="https://instagram.com/reelsense" target="_blank" rel="noopener noreferrer" title="Follow us on Instagram">
+                        <i class="fab fa-instagram"></i>
+                    </a>
+                    <a href="https://linkedin.com/company/reelsense" target="_blank" rel="noopener noreferrer" title="Connect on LinkedIn">
+                        <i class="fab fa-linkedin"></i>
+                    </a>
+                    <a href="https://youtube.com/@reelsense" target="_blank" rel="noopener noreferrer" title="Subscribe on YouTube">
+                        <i class="fab fa-youtube"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Reel Sense. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Processing your request...</p>
+    </div>
+
+    <!-- Sample Video Modal -->
+    <div class="video-modal" id="sampleVideoModal" onclick="closeSampleVideoModal(event)">
+        <div class="video-modal-content" onclick="event.stopPropagation()">
+            <button class="video-modal-close" onclick="closeSampleVideoModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="video-modal-header">
+                <h3><i class="fas fa-play-circle"></i> Sample AI-Generated Video</h3>
+                <p>Created with Reel Sense in under 5 minutes</p>
+            </div>
+            <div class="video-modal-body">
+                <video id="sampleVideoPlayer" controls playsinline preload="auto">
+                    <!-- Sample videos - multiple fallbacks -->
+                    <source src="/sample_demo.mp4" type="video/mp4">
+                    <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="video-modal-footer">
+                <button class="btn btn-primary" onclick="closeSampleVideoModal(); scrollToGenerator();">
+                    <i class="fas fa-rocket"></i> Create Your Own
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/app.js?v=101.0"></script>
+
+    <!-- Sample Video Modal Script -->
+    <script>
+        function openSampleVideoModal() {
+            const modal = document.getElementById('sampleVideoModal');
+            const video = document.getElementById('sampleVideoPlayer');
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+            // Auto-play when modal opens
+            setTimeout(() => video.play().catch(() => {}), 300);
+        }
+
+        function closeSampleVideoModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            const modal = document.getElementById('sampleVideoModal');
+            const video = document.getElementById('sampleVideoPlayer');
+            video.pause();
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeSampleVideoModal();
+        });
+    </script>
+
+    <!-- Live Activity Animation -->
+    <script>
+        (function() {
+            // More authentic activity feed - varied actions, realistic names
+            const activities = [
+                { name: 'Sarah M.', initial: 'S', action: 'started editing a product demo' },
+                { name: 'Marcus K.', initial: 'M', action: 'exported their video to MP4' },
+                { name: 'Emily R.', initial: 'E', action: 'is generating a travel ad' },
+                { name: 'David L.', initial: 'D', action: 'added voice-over to their reel' },
+                { name: 'Lisa T.', initial: 'L', action: 'downloaded their finished video' },
+                { name: 'James P.', initial: 'J', action: 'is reviewing their script' },
+                { name: 'Sofia A.', initial: 'S', action: 'shared a video to their team' },
+                { name: 'Ryan H.', initial: 'R', action: 'started a new project' },
+                { name: 'Anna W.', initial: 'A', action: 'is customizing their intro' },
+                { name: 'Mike C.', initial: 'M', action: 'regenerated their script' },
+                { name: 'Priya S.', initial: 'P', action: 'exported in HD quality' },
+                { name: 'Chen L.', initial: 'C', action: 'is previewing their video' },
+                { name: 'Jordan B.', initial: 'J', action: 'copied their share link' },
+                { name: 'Alex N.', initial: 'A', action: 'uploaded brand guidelines' }
+            ];
+
+            let currentIndex = 0;
+            const feedElement = document.getElementById('activityFeed');
+            const liveUsersElement = document.getElementById('liveUsers');
+            const totalVideosElement = document.getElementById('totalVideos');
+
+            // Update activity feed every 3.5 seconds
+            function updateActivityFeed() {
+                if (!feedElement) return;
+
+                currentIndex = (currentIndex + 1) % activities.length;
+                const activity = activities[currentIndex];
+                const timeAgo = Math.floor(Math.random() * 25) + 2;
+
+                feedElement.innerHTML = `
+                    <div class="activity-item">
+                        <div class="activity-avatar">${activity.initial}</div>
+                        <span><strong>${activity.name}</strong> ${activity.action}</span>
+                        <span class="activity-time">${timeAgo}s ago</span>
+                    </div>
+                `;
+            }
+
+            // Animate live users count with smooth transition
+            function animateLiveUsers() {
+                if (!liveUsersElement) return;
+
+                const current = parseInt(liveUsersElement.textContent) || 127;
+                const change = Math.floor(Math.random() * 5) - 2; // -2 to +2
+                const newValue = Math.max(115, Math.min(185, current + change));
+
+                // Add pulse effect
+                liveUsersElement.style.transition = 'transform 0.2s ease';
+                liveUsersElement.style.transform = 'scale(1.1)';
+                liveUsersElement.textContent = newValue;
+
+                setTimeout(() => {
+                    liveUsersElement.style.transform = 'scale(1)';
+                }, 200);
+            }
+
+            // Animate total videos count
+            function animateTotalVideos() {
+                if (!totalVideosElement) return;
+
+                const currentText = totalVideosElement.textContent.replace(/,/g, '');
+                const current = parseInt(currentText) || 52847;
+                const increase = Math.floor(Math.random() * 3) + 1; // 1 to 3
+                const newValue = current + increase;
+                totalVideosElement.textContent = newValue.toLocaleString();
+            }
+
+            // Start animations after page load
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startAnimations);
+            } else {
+                startAnimations();
+            }
+
+            function startAnimations() {
+                // Initial update
+                setTimeout(updateActivityFeed, 1000);
+
+                // Regular intervals
+                setInterval(updateActivityFeed, 3500);
+                setInterval(animateLiveUsers, 4000);
+                setInterval(animateTotalVideos, 6000);
+            }
+        })();
+    </script>
+
+    <!-- Stat Count-Up Animation -->
+    <script>
+        (function() {
+            // Animate numbers counting up
+            function animateCountUp(element, target, duration = 2000) {
+                const start = 0;
+                const increment = target / (duration / 16);
+                let current = start;
+
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        current = target;
+                        clearInterval(timer);
+                    }
+
+                    // Format the number
+                    if (target >= 1000) {
+                        element.textContent = Math.floor(current).toLocaleString() + '+';
+                    } else if (target < 10) {
+                        element.textContent = Math.floor(current) + '-' + (Math.floor(current) + 1);
+                    } else {
+                        element.textContent = Math.floor(current);
+                    }
+
+                    // Add pop animation
+                    element.classList.add('counting');
+                    setTimeout(() => element.classList.remove('counting'), 100);
+                }, 16);
+            }
+
+            // Intersection Observer for stats section
+            const statsSection = document.querySelector('.stats-section');
+            let hasAnimated = false;
+
+            if (statsSection) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && !hasAnimated) {
+                            hasAnimated = true;
+
+                            // Find all stat numbers and animate them
+                            const statCards = document.querySelectorAll('.stat-number');
+                            statCards.forEach((card, index) => {
+                                setTimeout(() => {
+                                    const text = card.textContent;
+                                    if (text.includes('50K')) {
+                                        animateCountUp(card, 50000, 2500);
+                                    } else if (text.includes('2-3')) {
+                                        card.textContent = '2-3';
+                                    } else if (text.includes('HD')) {
+                                        card.textContent = 'HD';
+                                    } else if (text.includes('AI')) {
+                                        card.textContent = 'AI';
+                                    }
+                                }, index * 200);
+                            });
+                        }
+                    });
+                }, { threshold: 0.3 });
+
+                observer.observe(statsSection);
+            }
+
+            // Add ripple effect to buttons
+            document.querySelectorAll('.btn').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    const rect = this.getBoundingClientRect();
+                    const x = ((e.clientX - rect.left) / rect.width) * 100;
+                    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+                    this.style.setProperty('--ripple-x', x + '%');
+                    this.style.setProperty('--ripple-y', y + '%');
+                    this.classList.add('ripple');
+
+                    setTimeout(() => this.classList.remove('ripple'), 600);
+                });
+            });
+        })();
+    </script>
+
+    <!-- Auth State Handler - Redirect to login if not authenticated -->
+    <script>
+        (function() {
+            'use strict';
+
+            // Check if user is logged in
+            const token = localStorage.getItem('access_token');
+            const userStr = localStorage.getItem('user');
+            const authLink = document.getElementById('authLink');
+
+            // If not logged in, redirect to login page
+            if (!token || !userStr) {
+                window.location.href = '/auth.html';
+                return;
+            }
+
+            // User is logged in - update UI
+            if (authLink) {
+                try {
+                    const user = JSON.parse(userStr);
+                    const navMenu = authLink.parentElement;
+
+                    // Add Credits display in navbar
+                    const creditsDisplay = document.createElement('span');
+                    creditsDisplay.id = 'navCreditsDisplay';
+                    creditsDisplay.className = 'nav-link';
+                    creditsDisplay.style.cssText = 'display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 6px 12px; border-radius: 20px; font-weight: 600; color: #92400e; cursor: default;';
+                    creditsDisplay.innerHTML = '<i class="fas fa-coins" style="color: #f59e0b;"></i> <span id="navCreditBalance">--</span>';
+                    navMenu.insertBefore(creditsDisplay, authLink);
+
+                    // Load credits from API
+                    fetch((window.APP_CONFIG?.API_BASE || '/api/v1') + '/auth/user/credits', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success' && data.data) {
+                            document.getElementById('navCreditBalance').textContent = data.data.balance || 0;
+                        }
+                    })
+                    .catch(err => console.error('Failed to load credits:', err));
+
+                    // Add My Videos link for all logged-in users
+                    const videosLink = document.createElement('a');
+                    videosLink.href = '/videos.html';
+                    videosLink.className = 'nav-link';
+                    videosLink.innerHTML = '<i class="fas fa-film"></i> My Videos';
+                    videosLink.style.color = '#826c6c';
+                    navMenu.insertBefore(videosLink, creditsDisplay);
+
+                    // Add Admin Dashboard link for admin/superadmin users
+                    if (['admin', 'superadmin'].includes(user.role)) {
+                        const adminLink = document.createElement('a');
+                        adminLink.href = '/admin.html';
+                        adminLink.className = 'nav-link';
+                        adminLink.innerHTML = '<i class="fas fa-shield-halved"></i> Admin';
+                        adminLink.style.color = '#826c6c';
+                        adminLink.style.fontWeight = '600';
+                        navMenu.insertBefore(adminLink, creditsDisplay);
+                    }
+
+                    authLink.innerHTML = '<i class="fas fa-user-circle"></i> ' + (user.name || user.email.split('@')[0]);
+                    authLink.href = '#';
+                    authLink.onclick = function(e) {
+                        e.preventDefault();
+                        if (confirm('Sign out of Reel Sense?')) {
+                            // Clear auth data
+                            localStorage.removeItem('access_token');
+                            localStorage.removeItem('refresh_token');
+                            localStorage.removeItem('api_key');
+                            localStorage.removeItem('user');
+                            localStorage.removeItem('authToken');
+                            // Clear app state (project data)
+                            localStorage.removeItem('appState');
+                            localStorage.removeItem('projectHistory');
+                            window.location.href = '/auth.html';
+                        }
+                    };
+                } catch (e) {
+                    console.error('Error parsing user:', e);
+                    // Invalid user data, redirect to login
+                    window.location.href = '/auth.html';
+                }
+            }
+        })();
+    </script>
+
+    <!-- Credit Cost Display Handler -->
+    <script>
+        (function() {
+            'use strict';
+
+            // Calculate video credits (1 credit = 1 second, minimum 5)
+            function calculateCredits(duration) {
+                return Math.max(5, parseInt(duration) || 5);
+            }
+
+            // Update credit cost display
+            function updateCreditCost() {
+                const durationSelect = document.getElementById('duration');
+                const costDisplay = document.getElementById('videoCreditCost');
+
+                if (durationSelect && costDisplay) {
+                    const duration = parseInt(durationSelect.value) || 15;
+                    const credits = calculateCredits(duration);
+                    costDisplay.textContent = credits;
+                }
+            }
+
+            // Load and display user credit balance
+            async function loadUserCredits() {
+                const balanceDisplay = document.getElementById('userCreditBalance');
+                if (!balanceDisplay) return;
+
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    balanceDisplay.textContent = '--';
+                    return;
+                }
+
+                try {
+                    const response = await fetch((window.APP_CONFIG?.API_BASE || '/api/v1') + '/auth/user/credits', {
+                        headers: {
+                            'Authorization': 'Bearer ' + token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.status === 'success' && data.data) {
+                            balanceDisplay.textContent = data.data.balance || 0;
+                            // Update color based on balance
+                            const balance = data.data.balance || 0;
+                            if (balance < 10) {
+                                balanceDisplay.style.color = '#ef4444';
+                            } else if (balance < 30) {
+                                balanceDisplay.style.color = '#f59e0b';
+                            } else {
+                                balanceDisplay.style.color = '#10b981';
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to load credits:', error);
+                    balanceDisplay.textContent = '--';
+                }
+            }
+
+            // Initialize on DOM ready
+            document.addEventListener('DOMContentLoaded', function() {
+                // Initial load
+                updateCreditCost();
+                loadUserCredits();
+
+                // Listen for duration changes
+                const durationSelect = document.getElementById('duration');
+                if (durationSelect) {
+                    durationSelect.addEventListener('change', updateCreditCost);
+                }
+
+                // Expose function globally for manual refresh
+                window.refreshCredits = loadUserCredits;
+            });
+        })();
+    </script>
+
+    <!-- Video Fallback Handler -->
+    <script>
+        (function() {
+            'use strict';
+
+            // Local sample video
+            const fallbackVideos = [
+                '/sample_demo.mp4'
+            ];
+
+            function tryLoadVideo(video, index) {
+                if (index >= fallbackVideos.length) {
+                    console.log('All video sources failed, showing poster');
+                    return;
+                }
+
+                video.src = fallbackVideos[index];
+                video.load();
+
+                video.oncanplay = function() {
+                    console.log('Video loaded successfully:', fallbackVideos[index]);
+                    video.play().catch(e => console.log('Autoplay blocked:', e));
+                };
+
+                video.onerror = function() {
+                    console.log('Video failed:', fallbackVideos[index]);
+                    tryLoadVideo(video, index + 1);
+                };
+            }
+
+            // Handle phone mockup video
+            const phoneVideo = document.querySelector('.phone-sample-video');
+            if (phoneVideo) {
+                phoneVideo.onerror = function() {
+                    console.log('Primary video source failed, trying fallbacks...');
+                    tryLoadVideo(phoneVideo, 0);
+                };
+
+                // Try to play immediately
+                phoneVideo.play().catch(e => {
+                    console.log('Initial autoplay blocked, will retry on user interaction');
+                });
+            }
+
+            // Enable video playback on first user interaction (for mobile)
+            document.addEventListener('click', function enableVideo() {
+                const videos = document.querySelectorAll('video[autoplay]');
+                videos.forEach(v => {
+                    v.play().catch(() => {});
+                });
+                document.removeEventListener('click', enableVideo);
+            }, { once: true });
+        })();
+    </script>
+</body>
+</html>

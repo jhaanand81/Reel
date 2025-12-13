@@ -1,0 +1,11 @@
+# Nixpacks configuration for Railway deployment
+# Ensures FFmpeg is available for video processing
+
+[phases.setup]
+nixPkgs = ["ffmpeg", "python311"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "cd backend && gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300 main:app"

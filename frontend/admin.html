@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="ReelSense AI - Admin Dashboard">
+    <title>Admin Dashboard - Reel Sense AI</title>
+
+    <!-- Fonts - Matching ContestSense.ai -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;700&family=Fjalla+One&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Chart.js for Analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/styles.css?v=101.0">
+
+    <!-- Configuration -->
+    <script src="js/config.js?v=3.0"></script>
+
+    <style>
+        /* Admin Dashboard Specific Styles */
+        .admin-container {
+            padding-top: 100px;
+            min-height: 100vh;
+            background: var(--light);
+        }
+
+        .admin-header {
+            background: var(--white);
+            padding: var(--space-lg) 0;
+            border-bottom: 1px solid var(--gray-light);
+            margin-bottom: var(--space-lg);
+        }
+
+        .admin-header .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .admin-title {
+            font-family: var(--font-display);
+            font-size: var(--font-size-3xl);
+            color: var(--dark);
+        }
+
+        .admin-title i {
+            color: var(--primary);
+            margin-right: var(--space-sm);
+        }
+
+        .admin-user-info {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+        }
+
+        .admin-user-info .user-badge {
+            background: var(--primary);
+            color: var(--white);
+            padding: 4px 12px;
+            border-radius: var(--radius-full);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: var(--space-md);
+            margin-bottom: var(--space-xl);
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-card .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            margin-bottom: var(--space-sm);
+        }
+
+        .stat-card .stat-icon.users { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .stat-card .stat-icon.videos { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .stat-card .stat-icon.credits { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .stat-card .stat-icon.active { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+
+        .stat-card .stat-value {
+            font-size: var(--font-size-3xl);
+            font-weight: 700;
+            color: var(--dark);
+            line-height: 1.2;
+        }
+
+        .stat-card .stat-label {
+            color: var(--gray);
+            font-size: var(--font-size-sm);
+            margin-top: 4px;
+        }
+
+        /* Tab Navigation */
+        .admin-tabs {
+            display: flex;
+            gap: var(--space-xs);
+            background: var(--white);
+            padding: var(--space-xs);
+            border-radius: var(--radius-lg);
+            margin-bottom: var(--space-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .admin-tab {
+            flex: 1;
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            color: var(--gray);
+            background: transparent;
+            border: none;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .admin-tab:hover {
+            background: var(--light);
+            color: var(--dark);
+        }
+
+        .admin-tab.active {
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .admin-tab i {
+            margin-right: var(--space-xs);
+        }
+
+        /* Panel Styles */
+        .admin-panel {
+            display: none;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .admin-panel.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--space-lg);
+            padding-bottom: var(--space-md);
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .panel-header h3 {
+            font-size: var(--font-size-xl);
+            color: var(--dark);
+        }
+
+        .panel-header h3 i {
+            color: var(--primary);
+            margin-right: var(--space-xs);
+        }
+
+        /* Search Box */
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .search-box input {
+            padding: var(--space-xs) var(--space-md);
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            width: 250px;
+            transition: var(--transition);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(130, 108, 108, 0.1);
+        }
+
+        /* Data Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: var(--space-sm) var(--space-md);
+            text-align: left;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .data-table th {
+            background: var(--light);
+            font-weight: 600;
+            color: var(--dark);
+            font-size: var(--font-size-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table tr:hover {
+            background: rgba(130, 108, 108, 0.03);
+        }
+
+        .data-table .user-cell {
+            display: flex;
+            align-items: center;
+            gap: var(--space-sm);
+        }
+
+        .data-table .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-full);
+            background: var(--primary);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+        }
+
+        .data-table .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .data-table .user-name {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .data-table .user-email {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        /* Role Badge */
+        .role-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .role-badge.superadmin { background: #fef3c7; color: #92400e; }
+        .role-badge.admin { background: #dbeafe; color: #1e40af; }
+        .role-badge.editor { background: #d1fae5; color: #065f46; }
+        .role-badge.viewer { background: #e0e7ff; color: #3730a3; }
+        .role-badge.api { background: #fce7f3; color: #9d174d; }
+        .role-badge.user { background: #f3f4f6; color: #374151; }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-badge.active { background: #d1fae5; color: #065f46; }
+        .status-badge.inactive { background: #fee2e2; color: #991b1b; }
+        .status-badge.completed { background: #d1fae5; color: #065f46; }
+        .status-badge.processing { background: #fef3c7; color: #92400e; }
+        .status-badge.failed { background: #fee2e2; color: #991b1b; }
+
+        .status-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        /* Action Buttons */
+        .action-btns {
+            display: flex;
+            gap: var(--space-xs);
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .action-btn.view { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .action-btn.edit { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .action-btn.credits { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .action-btn.delete { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        .action-btn:hover {
+            transform: scale(1.1);
+        }
+
+        /* Credits Display */
+        .credits-display {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        .credits-display i {
+            color: #f59e0b;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .modal-header {
+            padding: var(--space-lg);
+            border-bottom: 1px solid var(--gray-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: var(--font-size-xl);
+            color: var(--dark);
+        }
+
+        .modal-close {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-full);
+            border: none;
+            background: var(--light);
+            color: var(--gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            background: var(--danger);
+            color: var(--white);
+        }
+
+        .modal-body {
+            padding: var(--space-lg);
+        }
+
+        .modal-footer {
+            padding: var(--space-lg);
+            border-top: 1px solid var(--gray-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-sm);
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: var(--space-md);
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: var(--space-xs);
+            font-size: var(--font-size-sm);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: var(--space-sm);
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-base);
+            transition: var(--transition);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(130, 108, 108, 0.1);
+        }
+
+        /* User Detail Card */
+        .user-detail-card {
+            background: var(--light);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+            margin-bottom: var(--space-md);
+        }
+
+        .user-detail-header {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            margin-bottom: var(--space-md);
+        }
+
+        .user-detail-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: var(--radius-full);
+            background: var(--primary);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+        }
+
+        .user-detail-info h4 {
+            font-size: var(--font-size-xl);
+            color: var(--dark);
+            margin-bottom: 4px;
+        }
+
+        .user-detail-info p {
+            color: var(--gray);
+            font-size: var(--font-size-sm);
+        }
+
+        .user-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--space-md);
+        }
+
+        .user-stat-item {
+            text-align: center;
+            padding: var(--space-sm);
+            background: var(--white);
+            border-radius: var(--radius-md);
+        }
+
+        .user-stat-item .value {
+            font-size: var(--font-size-2xl);
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .user-stat-item .label {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        /* Credit History */
+        .credit-history {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .credit-history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-sm);
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .credit-history-item:last-child {
+            border-bottom: none;
+        }
+
+        .credit-amount.positive {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .credit-amount.negative {
+            color: #ef4444;
+            font-weight: 600;
+        }
+
+        /* Video Card */
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: var(--space-md);
+        }
+
+        .video-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+
+        .video-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .video-thumbnail {
+            position: relative;
+            aspect-ratio: 16/9;
+            background: var(--dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-thumbnail video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-thumbnail .play-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 1.25rem;
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .video-card:hover .play-overlay {
+            opacity: 1;
+        }
+
+        .video-info {
+            padding: var(--space-md);
+        }
+
+        .video-info h4 {
+            font-size: var(--font-size-base);
+            color: var(--dark);
+            margin-bottom: var(--space-xs);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .video-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        /* Loading State */
+        .loading-spinner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: var(--space-2xl);
+        }
+
+        .loading-spinner i {
+            font-size: 2rem;
+            color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: var(--space-2xl);
+            color: var(--gray);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: var(--space-md);
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .admin-header .container {
+                flex-direction: column;
+                gap: var(--space-md);
+                text-align: center;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .admin-tabs {
+                flex-wrap: wrap;
+            }
+
+            .admin-tab {
+                flex: 1 1 45%;
+            }
+
+            .data-table {
+                display: block;
+                overflow-x: auto;
+            }
+
+            .search-box input {
+                width: 100%;
+            }
+
+            .panel-header {
+                flex-direction: column;
+                gap: var(--space-md);
+                align-items: flex-start;
+            }
+        }
+
+        /* Analytics Styles */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: var(--space-lg);
+            margin-bottom: var(--space-xl);
+        }
+
+        .chart-card {
+            background: var(--white);
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+        }
+
+        .chart-card h4 {
+            margin-bottom: var(--space-md);
+            color: var(--dark);
+            font-size: var(--font-size-md);
+        }
+
+        .chart-card canvas {
+            width: 100% !important;
+            height: 250px !important;
+        }
+
+        .top-users-section {
+            background: var(--light);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
+        }
+
+        .top-users-section h4 {
+            margin-bottom: var(--space-md);
+            color: var(--dark);
+        }
+
+        .top-user-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--space-sm) 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .top-user-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Settings Styles */
+        .settings-grid {
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-md);
+        }
+
+        .setting-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-lg);
+            padding: var(--space-md);
+            background: var(--light);
+            border-radius: var(--radius-md);
+        }
+
+        .setting-item .setting-info {
+            flex: 1;
+        }
+
+        .setting-item .setting-info label {
+            font-weight: 600;
+            color: var(--dark);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .setting-item .setting-info p {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+            margin: 0;
+        }
+
+        .setting-item input,
+        .setting-item select {
+            width: 150px;
+            padding: var(--space-xs) var(--space-sm);
+            border: 1px solid var(--gray-light);
+            border-radius: var(--radius-md);
+        }
+
+        /* Notification Styles */
+        .notification-item {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--space-md);
+            padding: var(--space-md);
+            background: var(--light);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-sm);
+        }
+
+        .notification-item .notif-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notification-item .notif-icon.info { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .notification-item .notif-icon.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .notification-item .notif-icon.success { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .notification-item .notif-icon.error { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        .notification-item .notif-content {
+            flex: 1;
+        }
+
+        .notification-item .notif-title {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 4px;
+        }
+
+        .notification-item .notif-message {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        .notification-item .notif-meta {
+            font-size: 11px;
+            color: var(--gray);
+            margin-top: var(--space-xs);
+        }
+
+        /* Ticket Styles */
+        .ticket-stats {
+            display: flex;
+            gap: var(--space-md);
+            margin-bottom: var(--space-lg);
+        }
+
+        .ticket-stat {
+            padding: var(--space-sm) var(--space-md);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+        }
+
+        .ticket-stat.open { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .ticket-stat.in_progress { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .ticket-stat.resolved { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .ticket-stat.urgent { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        .ticket-item {
+            padding: var(--space-md);
+            background: var(--light);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--space-sm);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .ticket-item:hover {
+            background: rgba(130, 108, 108, 0.1);
+        }
+
+        .ticket-item .ticket-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: var(--space-xs);
+        }
+
+        .ticket-item .ticket-subject {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .ticket-item .ticket-meta {
+            font-size: var(--font-size-sm);
+            color: var(--gray);
+        }
+
+        /* Audit Log Styles */
+        .log-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-md);
+            padding: var(--space-sm) 0;
+            border-bottom: 1px solid var(--gray-light);
+        }
+
+        .log-item .log-action {
+            font-weight: 600;
+            color: var(--dark);
+            min-width: 150px;
+        }
+
+        .log-item .log-details {
+            flex: 1;
+            color: var(--gray);
+            font-size: var(--font-size-sm);
+        }
+
+        .log-item .log-time {
+            font-size: 11px;
+            color: var(--gray);
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: var(--font-size-sm);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--space-xl);
+            color: var(--gray);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: var(--space-md);
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="nav-brand">
+                <svg class="brand-ring" viewBox="0 0 50 50" width="36" height="36">
+                    <line x1="25" y1="5" x2="45" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="45" y1="20" x2="40" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="40" y1="42" x2="10" y2="42" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="10" y1="42" x2="5" y2="20" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="5" y1="20" x2="25" y2="5" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="25" y1="5" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="5" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <line x1="45" y1="20" x2="25" y2="28" stroke="#c4b5a5" stroke-width="1.5"/>
+                    <circle cx="25" cy="5" r="4" fill="#c73e1d"/>
+                    <circle cx="45" cy="20" r="4" fill="#f4a127"/>
+                    <circle cx="40" cy="42" r="4" fill="#826c6c"/>
+                    <circle cx="10" cy="42" r="4" fill="#3d2314"/>
+                    <circle cx="5" cy="20" r="4" fill="#d4a84b"/>
+                    <circle cx="25" cy="28" r="3" fill="#a8948f"/>
+                </svg>
+                <span>Reel Sense</span>
+            </a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">
+                    <i class="fas fa-home"></i> Home
+                </a>
+                <a href="admin.html" class="nav-link active">
+                    <i class="fas fa-shield-halved"></i> Admin
+                </a>
+                <a href="#" class="nav-link" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+            </div>
+            <button class="mobile-toggle" id="mobileToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Admin Container -->
+    <div class="admin-container">
+        <!-- Admin Header -->
+        <div class="admin-header">
+            <div class="container">
+                <h1 class="admin-title">
+                    <i class="fas fa-shield-halved"></i>
+                    Admin Dashboard
+                </h1>
+                <div class="admin-user-info">
+                    <span id="adminEmail">admin@example.com</span>
+                    <span class="user-badge" id="adminRole">ADMIN</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <!-- Stats Cards -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-icon users">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-value" id="statTotalUsers">-</div>
+                    <div class="stat-label">Total Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon videos">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <div class="stat-value" id="statTotalVideos">-</div>
+                    <div class="stat-label">Total Videos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon credits">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="stat-value" id="statTotalCredits">-</div>
+                    <div class="stat-label">Credits Issued</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon active">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <div class="stat-value" id="statActiveToday">-</div>
+                    <div class="stat-label">Active Today</div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="users">
+                    <i class="fas fa-users"></i> Users
+                </button>
+                <button class="admin-tab" data-tab="videos">
+                    <i class="fas fa-video"></i> Videos
+                </button>
+                <button class="admin-tab" data-tab="credits">
+                    <i class="fas fa-coins"></i> Credits
+                </button>
+                <button class="admin-tab" data-tab="analytics">
+                    <i class="fas fa-chart-line"></i> Analytics
+                </button>
+                <button class="admin-tab" data-tab="settings">
+                    <i class="fas fa-cog"></i> Settings
+                </button>
+                <button class="admin-tab" data-tab="notifications">
+                    <i class="fas fa-bell"></i> Alerts
+                </button>
+                <button class="admin-tab" data-tab="tickets">
+                    <i class="fas fa-ticket-alt"></i> Tickets
+                </button>
+                <button class="admin-tab" data-tab="logs">
+                    <i class="fas fa-history"></i> Logs
+                </button>
+            </div>
+
+            <!-- Users Panel -->
+            <div class="admin-panel active" id="usersPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-users"></i> User Management</h3>
+                    <div class="search-box">
+                        <input type="text" id="userSearch" placeholder="Search users...">
+                        <button class="btn btn-primary" onclick="refreshUsers()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="usersTableContainer">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Videos Panel -->
+            <div class="admin-panel" id="videosPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-video"></i> Video Management</h3>
+                    <div class="search-box">
+                        <input type="text" id="videoSearch" placeholder="Search videos...">
+                        <button class="btn btn-primary" onclick="refreshVideos()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="videosContainer">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credits Panel -->
+            <div class="admin-panel" id="creditsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-coins"></i> Credits Overview</h3>
+                    <button class="btn btn-primary" onclick="openBulkCreditsModal()">
+                        <i class="fas fa-gift"></i> Bulk Add Credits
+                    </button>
+                </div>
+                <div id="creditsTableContainer">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Panel -->
+            <div class="admin-panel" id="analyticsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-chart-line"></i> Analytics Dashboard</h3>
+                    <div class="search-box">
+                        <select id="analyticsDays" onchange="loadAnalytics()">
+                            <option value="7">Last 7 days</option>
+                            <option value="30" selected>Last 30 days</option>
+                            <option value="90">Last 90 days</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="exportData('users')">
+                            <i class="fas fa-download"></i> Export Users
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportData('transactions')">
+                            <i class="fas fa-download"></i> Export Transactions
+                        </button>
+                    </div>
+                </div>
+                <div class="analytics-grid">
+                    <div class="chart-card">
+                        <h4>User Growth</h4>
+                        <canvas id="userGrowthChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Video Generation</h4>
+                        <canvas id="videoTrendChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h4>Credit Usage</h4>
+                        <canvas id="creditTrendChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h4>User Roles Distribution</h4>
+                        <canvas id="roleDistChart"></canvas>
+                    </div>
+                </div>
+                <div class="top-users-section">
+                    <h4><i class="fas fa-trophy"></i> Top Users by Video Count</h4>
+                    <div id="topUsersContainer">
+                        <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Panel -->
+            <div class="admin-panel" id="settingsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-cog"></i> System Settings</h3>
+                    <button class="btn btn-primary" onclick="loadSettings()">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="settingsContainer">
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Default Free Credits</label>
+                                <p>Credits given to new users on signup</p>
+                            </div>
+                            <input type="number" id="setting_default_free_credits" value="100" min="0" max="10000">
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('default_free_credits')">Save</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Max Video Duration (seconds)</label>
+                                <p>Maximum allowed video duration</p>
+                            </div>
+                            <input type="number" id="setting_max_video_duration" value="60" min="10" max="300">
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('max_video_duration')">Save</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>API Rate Limit</label>
+                                <p>Requests per hour per user</p>
+                            </div>
+                            <input type="number" id="setting_api_rate_limit" value="100" min="10" max="1000">
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('api_rate_limit')">Save</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Maintenance Mode</label>
+                                <p>Disable access for non-admin users</p>
+                            </div>
+                            <select id="setting_maintenance_mode">
+                                <option value="false">Disabled</option>
+                                <option value="true">Enabled</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('maintenance_mode')">Save</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>User Registration</label>
+                                <p>Allow new user signups</p>
+                            </div>
+                            <select id="setting_registration_enabled">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('registration_enabled')">Save</button>
+                        </div>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label>Video Generation</label>
+                                <p>Enable video generation feature</p>
+                            </div>
+                            <select id="setting_video_generation_enabled">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary" onclick="updateSetting('video_generation_enabled')">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notifications Panel -->
+            <div class="admin-panel" id="notificationsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-bell"></i> Announcements</h3>
+                    <button class="btn btn-primary" onclick="openNotificationModal()">
+                        <i class="fas fa-plus"></i> New Announcement
+                    </button>
+                </div>
+                <div id="notificationsContainer">
+                    <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+                </div>
+            </div>
+
+            <!-- Tickets Panel -->
+            <div class="admin-panel" id="ticketsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-ticket-alt"></i> Support Tickets</h3>
+                    <div class="search-box">
+                        <select id="ticketStatusFilter" onchange="loadTickets()">
+                            <option value="">All Status</option>
+                            <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="resolved">Resolved</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadTickets()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="ticket-stats" id="ticketStats">
+                    <!-- Stats loaded dynamically -->
+                </div>
+                <div id="ticketsContainer">
+                    <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+                </div>
+            </div>
+
+            <!-- Audit Logs Panel -->
+            <div class="admin-panel" id="logsPanel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-history"></i> Audit Logs</h3>
+                    <div class="search-box">
+                        <input type="text" id="logActionFilter" placeholder="Filter by action...">
+                        <button class="btn btn-primary" onclick="loadAuditLogs()">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="logsContainer">
+                    <div class="loading-spinner"><i class="fas fa-spinner"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Detail Modal -->
+    <div class="modal-overlay" id="userDetailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>User Details</h3>
+                <button class="modal-close" onclick="closeModal('userDetailModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="userDetailContent">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('userDetailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Credits Modal -->
+    <div class="modal-overlay" id="addCreditsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-coins"></i> Add Credits</h3>
+                <button class="modal-close" onclick="closeModal('addCreditsModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>User</label>
+                    <input type="text" id="creditsUserDisplay" readonly>
+                    <input type="hidden" id="creditsUserId">
+                </div>
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" id="creditsAmount" min="1" max="10000" value="100" placeholder="Enter amount">
+                </div>
+                <div class="form-group">
+                    <label>Reason</label>
+                    <textarea id="creditsReason" rows="2" placeholder="Reason for credit grant">Admin credit grant</textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('addCreditsModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitAddCredits()">
+                    <i class="fas fa-plus"></i> Add Credits
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Role Modal -->
+    <div class="modal-overlay" id="changeRoleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-tag"></i> Change Role</h3>
+                <button class="modal-close" onclick="closeModal('changeRoleModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>User</label>
+                    <input type="text" id="roleUserDisplay" readonly>
+                    <input type="hidden" id="roleUserId">
+                </div>
+                <div class="form-group">
+                    <label>New Role</label>
+                    <select id="newRole">
+                        <option value="user">User</option>
+                        <option value="viewer">Viewer</option>
+                        <option value="editor">Editor</option>
+                        <option value="api">API</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('changeRoleModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitChangeRole()">
+                    <i class="fas fa-check"></i> Update Role
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div class="modal-overlay" id="confirmDeleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle" style="color: var(--danger);"></i> Confirm Delete</h3>
+                <button class="modal-close" onclick="closeModal('confirmDeleteModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmText">Are you sure you want to delete this item?</p>
+                <input type="hidden" id="deleteItemId">
+                <input type="hidden" id="deleteItemType">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('confirmDeleteModal')">Cancel</button>
+                <button class="btn" style="background: var(--danger); color: white;" onclick="confirmDelete()">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Notification Modal -->
+    <div class="modal-overlay" id="createNotificationModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-bell"></i> Create Announcement</h3>
+                <button class="modal-close" onclick="closeModal('createNotificationModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="notifTitle" placeholder="Announcement title">
+                </div>
+                <div class="form-group">
+                    <label>Message</label>
+                    <textarea id="notifMessage" rows="4" placeholder="Announcement message"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="notifType">
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="success">Success</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expires At (Optional)</label>
+                    <input type="datetime-local" id="notifExpires">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('createNotificationModal')">Cancel</button>
+                <button class="btn btn-primary" onclick="submitNotification()">
+                    <i class="fas fa-paper-plane"></i> Send Announcement
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ticket Detail Modal -->
+    <div class="modal-overlay" id="ticketDetailModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-ticket-alt"></i> Ticket Details</h3>
+                <button class="modal-close" onclick="closeModal('ticketDetailModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="ticketDetailContent">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('ticketDetailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin JS -->
+    <script src="js/admin.js?v=2.2"></script>
+</body>
+</html>
