@@ -45,8 +45,8 @@ class ReplicateService(VideoProviderBase):
         # WAN models - correct Replicate model names (2025)
         self.models_by_resolution = {
             "480p": "wan-video/wan-2.2-t2v-fast",
-            "720p": "wan-video/wan-2.5-t2v-fast",
-            "1080p": "wan-video/wan-2.5-t2v-fast"
+            "720p": "wan-video/wan-2.2-t2v-fast",
+            "1080p": "wan-video/wan-2.2-t2v-fast"
         }
         self.model_i2v = "wan-video/wan-2.2-i2v-fast"  # Image-to-video
         self.resolution = "480p"  # Default to fast 480p model

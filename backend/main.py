@@ -3872,9 +3872,12 @@ def register_routes(app, limiter):
                         project_data = atomic_read_json(script_path)
                         if 'video' not in project_data:
                             project_data['video'] = {}
+                        # Store both local and remote URLs so compose can download if needed
+                        remote_url = status.get('videoUrl') if status.get('videoUrl', '').startswith('http') else None
                         project_data['video'].update({
                             'status': VideoStatus.COMPLETED.value,
                             'url': local_video_url or status.get('videoUrl'),
+                            'remoteUrl': remote_url,  # Store remote URL for fallback download
                             'multiClip': is_multi_clip,
                             'clipCount': len(clip_paths) if clip_paths else 1,
                             'completed': datetime.utcnow().isoformat()
@@ -3977,12 +3980,36 @@ def register_routes(app, limiter):
 
             logger.info(f"Composing video for: {project_id}")
 
-            # Get target duration from project data
+            # Get target duration and video info from project data
             script_path = Path(f"outputs/scripts/{project_id}.json")
             target_duration = None
+            video_dir = Path(f"outputs/videos/{project_id}")
+            video_dir.mkdir(parents=True, exist_ok=True)
+            raw_video_path = video_dir / "raw.mp4"
+
             if script_path.exists():
                 project_data = atomic_read_json(script_path)
                 target_duration = project_data.get('duration')
+
+                # Check if video file exists, if not try to download it
+                if not raw_video_path.exists():
+                    logger.info(f"[COMPOSE] Video file missing, attempting download...")
+                    video_data = project_data.get('video', {})
+                    remote_url = video_data.get('remoteUrl') or video_data.get('url')
+
+                    if remote_url and remote_url.startswith('http'):
+                        try:
+                            logger.info(f"[COMPOSE] Downloading from: {remote_url[:80]}...")
+                            video_response = requests.get(remote_url, stream=True, timeout=180)
+                            video_response.raise_for_status()
+
+                            with open(raw_video_path, 'wb') as f:
+                                for chunk in video_response.iter_content(chunk_size=8192):
+                                    f.write(chunk)
+
+                            logger.info(f"[COMPOSE] Video downloaded to: {raw_video_path}")
+                        except Exception as e:
+                            logger.error(f"[COMPOSE] Failed to download video: {e}")
 
             # Compose video (returns dict with output_path, actual_duration, etc.)
             result = g.service.compose(
