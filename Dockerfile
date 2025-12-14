@@ -15,9 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
-# Set working directory to backend
-WORKDIR /app/backend
-
 # Expose port
 EXPOSE 5000
 
@@ -25,4 +22,4 @@ EXPOSE 5000
 ENV PORT=5000
 
 # Run the application
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300 main:app"]
+CMD gunicorn --chdir /app/backend --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300 main:app
