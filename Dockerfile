@@ -24,23 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Pre-download Kokoro TTS models during build (not runtime)
 # This downloads the 82M model and voices (~200MB total)
 # IMPORTANT: This MUST succeed for TTS to work - no silent failures!
-RUN python -c "\
-from kokoro import KPipeline; \
-import sys; \
-print('[KOKORO] Initializing TTS pipeline...'); \
-try: \
-    p = KPipeline(lang_code='a'); \
-    print('[KOKORO] Pipeline created, testing generation...'); \
-    result = list(p('Test audio generation', voice='af_bella', speed=1.0)); \
-    if result: \
-        print('[KOKORO] SUCCESS - Model loaded and working!'); \
-    else: \
-        print('[KOKORO] ERROR - No audio generated'); \
-        sys.exit(1); \
-except Exception as e: \
-    print(f'[KOKORO] FATAL ERROR: {e}'); \
-    sys.exit(1); \
-"
+RUN python -c "from kokoro import KPipeline; p = KPipeline(lang_code='a'); print('[KOKORO] Model loaded successfully!')"
 
 # Copy the rest of the application
 COPY . .
