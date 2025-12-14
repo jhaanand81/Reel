@@ -1488,22 +1488,44 @@ class LocalKokoroService:
     def __init__(self):
         self._available = None
         self._pipeline = None
+        self._init_error = None
 
     def is_available(self) -> bool:
-        """Check if local Kokoro library is available"""
+        """Check if local Kokoro library is available AND model is loaded
+
+        This properly tests that:
+        1. kokoro package is installed
+        2. misaki phonemizer is installed
+        3. espeak-ng is available
+        4. Model files can be loaded
+        """
         if self._available is None:
             try:
                 from kokoro import KPipeline
+                # Actually try to create the pipeline - this loads the model
+                logging.info("[KOKORO] Testing pipeline initialization...")
+                self._pipeline = KPipeline(lang_code="a")
+                logging.info("[KOKORO] Pipeline initialized successfully!")
                 self._available = True
-            except ImportError:
+            except ImportError as e:
+                logging.error(f"[KOKORO] Import failed: {e}")
+                self._init_error = f"Import error: {e}"
+                self._available = False
+            except Exception as e:
+                logging.error(f"[KOKORO] Initialization failed: {e}")
+                self._init_error = f"Init error: {e}"
                 self._available = False
         return self._available
+
+    def get_init_error(self) -> str:
+        """Get the initialization error message if any"""
+        return self._init_error
 
     def _get_pipeline(self):
         """Get or create Kokoro pipeline"""
         if self._pipeline is None and self.is_available():
-            from kokoro import KPipeline
-            self._pipeline = KPipeline(lang_code="a")
+            # Pipeline should already be created by is_available()
+            pass
         return self._pipeline
 
     def select_voice(self, script: str, voice_type: str = None, tone: str = None, category: str = None) -> str:
@@ -2618,20 +2640,30 @@ def initialize_services():
         services['groq'] = None
 
     try:
-        # Try OpenAI TTS first
-        tts = TTSService()
-        if tts.is_available():
-            services['tts'] = tts
-            logger.info("[OK] TTS service initialized (OpenAI)")
+        # Try Local Kokoro first (best quality, no API needed)
+        local_kokoro = LocalKokoroService()
+        if local_kokoro.is_available():
+            services['tts'] = local_kokoro
+            services['local_kokoro'] = local_kokoro  # Also store separately for health checks
+            logger.info("[OK] TTS service initialized (Local Kokoro - best quality)")
         else:
-            # Fall back to Kokoro
-            kokoro = KokoroService()
-            if kokoro.is_available():
-                services['tts'] = kokoro
-                logger.info("[OK] TTS service initialized (Kokoro)")
+            error_msg = local_kokoro.get_init_error() or "Unknown error"
+            logger.warning(f"[WARN] Local Kokoro unavailable: {error_msg}")
+
+            # Fall back to OpenAI TTS
+            tts = TTSService()
+            if tts.is_available():
+                services['tts'] = tts
+                logger.info("[OK] TTS service initialized (OpenAI)")
             else:
-                services['tts'] = None
-                logger.warning("[WARN] No TTS service available")
+                # Fall back to Kokoro API
+                kokoro = KokoroService()
+                if kokoro.is_available():
+                    services['tts'] = kokoro
+                    logger.info("[OK] TTS service initialized (Kokoro API)")
+                else:
+                    services['tts'] = None
+                    logger.warning("[WARN] No TTS service available - video generation will fail!")
     except Exception as e:
         logger.error(f"[ERROR] TTS initialization failed: {e}")
         services['tts'] = None
@@ -2968,7 +3000,9 @@ def register_routes(app, limiter):
                 all_healthy = False
 
         # Add aliases for frontend compatibility
-        service_status['kokoro'] = service_status.get('tts', False)
+        # Local Kokoro is the preferred TTS
+        service_status['kokoro'] = service_status.get('local_kokoro', service_status.get('tts', False))
+        service_status['local_kokoro'] = service_status.get('local_kokoro', False)
         service_status['runpod'] = service_status.get('replicate', False)
 
         return jsonify(ApiResponse(

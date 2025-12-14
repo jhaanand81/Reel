@@ -26,6 +26,7 @@ redis>=5.0.0
 imageio-ffmpeg>=0.4.9
 
 # TTS - Kokoro (primary, high-quality) + Edge TTS (fallback)
+# Note: Kokoro requires PyTorch (installed separately in Dockerfile for CPU-only)
 kokoro>=0.3.0
 misaki[en]>=0.1.0
 edge-tts>=6.1.0
