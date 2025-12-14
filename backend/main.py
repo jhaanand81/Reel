@@ -293,11 +293,12 @@ def require_auth(f):
 
 
 def require_admin(f):
-    """Decorator for admin-only endpoints (debug, metrics, etc.)
+    """Decorator for admin-only endpoints (debug, metrics, admin dashboard)
 
-    Only allows access if:
+    Allows access if ANY of:
     - FLASK_ENV is 'development', OR
-    - Request has valid ADMIN_API_KEY
+    - Request has valid ADMIN_API_KEY header, OR
+    - User is authenticated with admin/superadmin role (via require_auth)
     """
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -308,9 +309,14 @@ def require_admin(f):
         # Check admin API key
         api_key = request.headers.get('X-Admin-Key')
         admin_key = os.getenv('ADMIN_API_KEY')
-
         if admin_key and api_key == admin_key:
             return f(*args, **kwargs)
+
+        # Check if user is authenticated with admin role (set by require_auth)
+        if hasattr(g, 'current_user') and g.current_user:
+            user_role = g.current_user.get('role', '')
+            if user_role in ['admin', 'superadmin']:
+                return f(*args, **kwargs)
 
         # Forbidden
         return jsonify({
@@ -4218,25 +4224,7 @@ def register_routes(app, limiter):
     # ==========================================================================
     # ADMIN API ENDPOINTS
     # ==========================================================================
-
-    def require_admin(f):
-        """Decorator to require admin role"""
-        @wraps(f)
-        def decorated(*args, **kwargs):
-            if not hasattr(g, 'current_user') or not g.current_user:
-                return jsonify(ApiResponse(
-                    status=ResponseStatus.ERROR,
-                    error="Authentication required",
-                    error_code="AUTH_REQUIRED"
-                ).to_dict()), 401
-            if g.current_user.get('role') not in ['admin', 'superadmin']:
-                return jsonify(ApiResponse(
-                    status=ResponseStatus.ERROR,
-                    error="Admin access required",
-                    error_code="ADMIN_REQUIRED"
-                ).to_dict()), 403
-            return f(*args, **kwargs)
-        return decorated
+    # Uses global require_admin decorator defined at top of file
 
     @app.route(f'/api/{API_VERSION}/admin/stats', methods=['GET'])
     @require_auth
