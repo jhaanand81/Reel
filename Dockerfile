@@ -1,7 +1,12 @@
 FROM python:3.11-slim
 
-# Install FFmpeg
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# Install FFmpeg, espeak-ng (required for Kokoro TTS), and audio dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    espeak-ng \
+    libsndfile1 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -11,6 +16,10 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Pre-download Kokoro TTS models during build (not runtime)
+# This downloads the 82M model and voices (~200MB)
+RUN python -c "from kokoro import KPipeline; p = KPipeline(lang_code='a'); print('Kokoro ready')" || echo "Kokoro model download deferred"
 
 # Copy the rest of the application
 COPY . .

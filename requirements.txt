@@ -25,8 +25,12 @@ redis>=5.0.0
 # Video/Audio Processing
 imageio-ffmpeg>=0.4.9
 
-# Kokoro TTS (Local high-quality text-to-speech)
+# TTS - Kokoro (primary, high-quality) + Edge TTS (fallback)
 kokoro>=0.3.0
+misaki[en]>=0.1.0
+edge-tts>=6.1.0
+
+# Audio Processing
 soundfile>=0.12.0
 numpy>=1.24.0
 
