@@ -383,11 +383,26 @@ def sanitize_input(text: str, max_length: int = 500) -> str:
     return clean[:max_length].strip()
 
 
-def calculate_word_count(duration: int) -> Tuple[int, int, int]:
-    """Calculate exact word count for target duration
+def calculate_word_count(duration: int, length: str = None) -> Tuple[int, int, int]:
+    """Calculate exact word count for target duration or script length setting
+
+    Args:
+        duration: Target duration in seconds
+        length: Script length setting ('short', 'medium', 'long')
 
     Returns: (target_words, min_words, max_words)
     """
+    # PRIORITY: Use length setting if provided (matches UI expectations)
+    if length:
+        length_word_counts = {
+            'short': (62, 50, 75),      # Short: 50-75 words (avg ~62)
+            'medium': (100, 75, 125),   # Medium: 75-125 words (avg ~100)
+            'long': (162, 125, 200),    # Long: 125-200 words (avg ~162)
+        }
+        if length.lower() in length_word_counts:
+            return length_word_counts[length.lower()]
+
+    # Fallback: Calculate from duration
     target = int(duration * WORDS_PER_SECOND)
     min_words = max(10, target - WORD_COUNT_TOLERANCE)
     max_words = target + WORD_COUNT_TOLERANCE
@@ -426,8 +441,9 @@ class GroqService:
         topic = sanitize_input(topic, MAX_TOPIC_LENGTH)
         brand = sanitize_input(brand, 100) if brand else ""
 
-        # Calculate EXACT word count for target duration
-        target_words, min_words, max_words = calculate_word_count(duration)
+        # Calculate EXACT word count based on length setting (short/medium/long)
+        # This takes priority over duration-based calculation
+        target_words, min_words, max_words = calculate_word_count(duration, length)
 
         # Build prompt with STRICT word count requirement
         brand_context = f"\nBrand/Product: {brand}" if brand else ""
@@ -1484,45 +1500,104 @@ class LocalKokoroService:
             self._pipeline = KPipeline(lang_code="a")
         return self._pipeline
 
-    def select_voice(self, script: str, voice_type: str = None, category: str = None) -> str:
-        """Smart voice selection based on script content or category"""
+    def select_voice(self, script: str, voice_type: str = None, tone: str = None, category: str = None) -> str:
+        """Smart voice selection based on tone, script content, and category
+
+        Automatically selects the best voice matching:
+        1. Tone (witty, serious, sarcastic, professional, etc.)
+        2. Script content keywords
+        3. Category/brand context
+
+        User doesn't need to do anything - voice is selected automatically!
+        """
+        # Tone-based voice selection (highest priority)
+        tone_voice_map = {
+            # Witty/Fun tones - use energetic, expressive voices
+            'witty': 'af_sky',           # Youthful, energetic - perfect for witty content
+            'funny': 'af_sky',
+            'humorous': 'af_sky',
+
+            # Serious/Professional tones - use authoritative voices
+            'serious': 'am_adam',        # Deep, authoritative
+            'professional': 'af_sarah',  # Clear, professional
+            'formal': 'af_sarah',
+            'corporate': 'am_adam',
+
+            # Sarcastic/Edgy tones - use modern, engaging voices
+            'sarcastic': 'af_nova',      # Modern, engaging with edge
+            'edgy': 'af_nova',
+            'bold': 'af_nova',
+
+            # Emotional/Inspirational tones
+            'emotional': 'af_heart',     # Emotional, expressive
+            'inspirational': 'af_heart',
+            'heartfelt': 'af_heart',
+
+            # Calm/Soothing tones
+            'calm': 'af_river',          # Calm, soothing
+            'relaxed': 'af_river',
+            'peaceful': 'af_river',
+
+            # Casual/Friendly tones
+            'casual': 'af_bella',        # Warm, conversational
+            'friendly': 'am_michael',    # Warm, approachable
+            'conversational': 'af_bella',
+        }
+
+        # Check tone first (automatic selection based on user's tone choice in UI)
+        if tone and tone.lower() in tone_voice_map:
+            selected = tone_voice_map[tone.lower()]
+            logging.info(f"[KOKORO] Auto-selected voice '{selected}' for tone: {tone}")
+            return selected
+
         # Use explicit voice type if provided
         if voice_type and voice_type in self.VOICE_TYPE_MAP:
             return self.VOICE_TYPE_MAP[voice_type]
 
         script_lower = script.lower()
 
-        # Content-based detection
-        if any(word in script_lower for word in ["skincare", "beauty", "glow", "spa", "botanical", "serum"]):
+        # Content-based detection (analyzes script keywords)
+        if any(word in script_lower for word in ["skincare", "beauty", "glow", "spa", "botanical", "serum", "wellness"]):
             return "af_river"  # Calm, soothing
-        elif any(word in script_lower for word in ["energy", "workout", "fitness", "power", "dynamic"]):
+        elif any(word in script_lower for word in ["energy", "workout", "fitness", "power", "dynamic", "pump", "gains"]):
             return "af_sky"  # Youthful, energetic
-        elif any(word in script_lower for word in ["luxury", "premium", "elegant", "sophisticated"]):
+        elif any(word in script_lower for word in ["luxury", "premium", "elegant", "sophisticated", "exclusive"]):
             return "af_nova"  # Modern, engaging
-        elif any(word in script_lower for word in ["tech", "innovation", "smart", "digital"]):
+        elif any(word in script_lower for word in ["tech", "innovation", "smart", "digital", "ai", "software"]):
             return "af_sarah"  # Clear, professional
-        elif any(word in script_lower for word in ["travel", "adventure", "discover", "escape", "journey"]):
+        elif any(word in script_lower for word in ["travel", "adventure", "discover", "escape", "journey", "explore"]):
             return "af_bella"  # Warm, inspiring
-        elif any(word in script_lower for word in ["inspire", "dream", "believe", "heart"]):
+        elif any(word in script_lower for word in ["inspire", "dream", "believe", "heart", "hope", "love"]):
             return "af_heart"  # Emotional, expressive
-        elif any(word in script_lower for word in ["finance", "invest", "business", "professional"]):
+        elif any(word in script_lower for word in ["finance", "invest", "business", "money", "stock", "crypto"]):
             return "am_adam"  # Deep, authoritative
+        elif any(word in script_lower for word in ["food", "recipe", "delicious", "tasty", "cook", "chef"]):
+            return "af_nicole"  # Friendly, casual
+        elif any(word in script_lower for word in ["game", "gaming", "player", "stream", "esports"]):
+            return "af_sky"  # Youthful, energetic
 
-        # Default: af_heart (most natural and expressive)
+        # Default: af_heart (most natural and expressive for general content)
         return "af_heart"
 
     def generate_voiceover(self, text: str, voice_type: str = "female-warm",
-                          project_id: str = None, target_duration: float = None) -> Dict[str, Any]:
-        """Generate voiceover with two-pass exact-fit
+                          project_id: str = None, target_duration: float = None,
+                          tone: str = None) -> Dict[str, Any]:
+        """Generate voiceover with two-pass exact-fit and automatic voice selection
 
         Pass 1: Generate TTS naturally at 1.0x speed
         Pass 2: Exact-fit to target duration (silence trim, time-stretch, pad/trim)
 
+        Voice is automatically selected based on:
+        1. Tone setting (witty, serious, sarcastic, professional)
+        2. Script content analysis
+        3. Voice type preference
+
         Args:
             text: Script text to convert to speech
-            voice_type: Voice style to use
+            voice_type: Voice style preference (optional)
             project_id: Project identifier for file paths
             target_duration: If set, exact-fit audio to this duration
+            tone: Script tone for automatic voice matching (witty, serious, etc.)
 
         Returns:
             Dict with audio_path, actual_duration, voice, exact_fit_applied
@@ -1540,8 +1615,8 @@ class LocalKokoroService:
         raw_audio_path = audio_dir / "voiceover_raw.wav"
         final_audio_path = audio_dir / "voiceover.wav"
 
-        # Select best voice
-        voice = self.select_voice(text, voice_type)
+        # Select best voice automatically based on tone and content
+        voice = self.select_voice(text, voice_type, tone=tone)
         voice_info = self.VOICES.get(voice, {})
 
         logging.info(f"[KOKORO] Voice: {voice} ({voice_info.get('name', '')}) - {voice_info.get('style', '')}")
@@ -1656,8 +1731,27 @@ def get_media_duration(file_path: Path) -> float:
             return int(hours) * 3600 + int(minutes) * 60 + int(seconds) + int(ms) / 100
     except Exception as e:
         logging.warning(f"Could not get media duration: {e}")
-
     return 0.0
+
+
+def get_video_fps(file_path: Path) -> float:
+    """Get FPS of video file using ffmpeg -i"""
+    try:
+        result = subprocess.run([
+            FFMPEG_PATH, '-i', str(file_path)
+        ], capture_output=True, text=True, timeout=10)
+        output = result.stderr
+        # Look for fps in stream info (e.g., "24 fps" or "29.97 fps")
+        match = re.search(r'(\d+(?:\.\d+)?)\s*fps', output)
+        if match:
+            return float(match.group(1))
+        # Fallback: look for tbr (e.g., "30 tbr")
+        match = re.search(r'(\d+(?:\.\d+)?)\s*tbr', output)
+        if match:
+            return float(match.group(1))
+    except Exception as e:
+        logging.warning(f"Could not get video FPS: {e}")
+    return DEFAULT_FPS  # Fallback to default
 
 
 def validate_duration(actual: float, target: float, tolerance: float = 1.0) -> Tuple[bool, str]:
@@ -1991,26 +2085,37 @@ class VideoComposer:
 
     def _build_compose_command(self, video_file: Path, audio_file: Path,
                                output_path: Path, video_duration: float,
-                               audio_duration: float, target_duration: float) -> List[str]:
+                               audio_duration: float, target_duration: float,
+                               video_fps: float = None) -> List[str]:
         """Build FFmpeg command with proper duration handling
 
         Strategy:
-        - If video is shorter than target: loop video
+        - If video is shorter than target: loop video seamlessly
         - If video is longer than target: trim video
         - If audio is shorter than target: pad with silence
         - If audio is longer than target: it should already be adjusted by TTS
         - Use explicit -t flag for exact duration
+
+        Works perfectly for 10-15 second clips by looping 5s video clips!
         """
         filters = []
+
+        # Use actual video FPS for accurate loop calculation
+        fps = video_fps or get_video_fps(video_file) or DEFAULT_FPS
 
         # Determine target (use explicit target, or audio duration, or video duration)
         actual_target = target_duration or audio_duration or video_duration
 
+        logging.info(f"[COMPOSE] Building command: video={video_duration:.1f}s @ {fps}fps, "
+                    f"audio={audio_duration:.1f}s, target={actual_target:.1f}s")
+
         # Video filter: handle duration mismatch
         if video_duration < actual_target - 0.5:
-            # Loop video to fill duration
+            # Loop video to fill duration (e.g., 5s video → 15s final)
             loop_count = int(actual_target / video_duration) + 1
-            filters.append(f"[0:v]loop=loop={loop_count}:size={int(video_duration * DEFAULT_FPS)}:start=0,trim=duration={actual_target},setpts=PTS-STARTPTS[v]")
+            frame_count = int(video_duration * fps)
+            logging.info(f"[COMPOSE] Looping video {loop_count}x (frame_count={frame_count})")
+            filters.append(f"[0:v]loop=loop={loop_count}:size={frame_count}:start=0,trim=duration={actual_target},setpts=PTS-STARTPTS[v]")
         elif video_duration > actual_target + 0.5:
             # Trim video
             filters.append(f"[0:v]trim=duration={actual_target},setpts=PTS-STARTPTS[v]")
@@ -2119,11 +2224,15 @@ class VideoComposer:
         self._create_srt(script, srt_path)
 
         # Add captions with ffmpeg
-        # FFmpeg subtitles filter on Windows needs special path escaping:
-        # - Use forward slashes
-        # - Escape colons (C: -> C\\:)
-        # - Escape backslashes
-        srt_path_escaped = str(srt_path).replace('\\', '/').replace(':', '\\:')
+        # FFmpeg subtitles filter needs special path escaping
+        # Windows: C:\path\file.srt -> C\\:/path/file.srt
+        # Linux: /app/path/file.srt -> /app/path/file.srt (no change needed)
+        import platform
+        if platform.system() == 'Windows':
+            srt_path_escaped = str(srt_path).replace('\\', '/').replace(':', '\\:')
+        else:
+            # Linux/Docker - just use the path as-is with forward slashes
+            srt_path_escaped = str(srt_path)
 
         # PROFESSIONAL caption styling - modern social media look
         # Impact font, thick outline, drop shadow - like TikTok/Reels captions
@@ -3044,7 +3153,7 @@ def register_routes(app, limiter):
             tone = data.get('tone', 'witty')
             duration = min(max(data.get('duration', 30), 5), MAX_VIDEO_DURATION)
 
-            logger.info(f"Generating script: topic={topic[:50]}..., duration={duration}s")
+            logger.info(f"Generating script: topic={topic[:50]}..., length={length}, tone={tone}, duration={duration}s")
 
             # Generate script with EXACT word count
             result = g.service.generate_script(
@@ -3058,8 +3167,8 @@ def register_routes(app, limiter):
             # Create project with UUID
             project_id = f"proj_{uuid.uuid4().hex[:12]}"
 
-            # Calculate target word count for validation
-            target_words, min_words, max_words = calculate_word_count(duration)
+            # Calculate target word count for validation (using length setting)
+            target_words, min_words, max_words = calculate_word_count(duration, length)
 
             # Save script with metadata
             script_data = {
@@ -3114,9 +3223,13 @@ def register_routes(app, limiter):
     @track_performance
     @idempotent(ttl=900)  # 15 minute TTL for voiceover generation
     def generate_voiceover():
-        """Generate voice-over with Edge-TTS and OPTIONAL duration matching
+        """Generate voice-over with Kokoro TTS and automatic voice selection
 
-        If targetDuration is provided, audio will be speed-adjusted to match.
+        Features:
+        - Automatic voice selection based on tone (witty, serious, sarcastic, professional)
+        - Content-aware voice matching (analyzes script keywords)
+        - Duration matching with exact-fit technology
+        - Falls back to Edge-TTS if Kokoro unavailable
         """
         try:
             data = g.validated_data
@@ -3135,33 +3248,36 @@ def register_routes(app, limiter):
                     request_id=g.request_id
                 ).to_dict()), 400
 
-            # Get target duration from project if not provided
-            if not target_duration:
-                script_path = Path(f"outputs/scripts/{project_id}.json")
-                if script_path.exists():
-                    project_data = atomic_read_json(script_path)
+            # Get target duration and tone from project data
+            tone = None
+            script_path = Path(f"outputs/scripts/{project_id}.json")
+            if script_path.exists():
+                project_data = atomic_read_json(script_path)
+                if not target_duration:
                     target_duration = project_data.get('duration')
+                tone = project_data.get('tone')  # Get tone for automatic voice selection
 
             logger.info(f"[TTS] Generating voiceover: project={project_id}, "
-                       f"target_duration={target_duration}s")
+                       f"target_duration={target_duration}s, tone={tone}")
 
-            # TTS Priority: Local Kokoro (best quality + exact-fit) > Edge-TTS > OpenAI
+            # TTS Priority: Local Kokoro (best quality + exact-fit + auto voice selection)
             audio_path = None
             actual_duration = None
             speed_adjusted = False
             voice_used = None
             exact_fit_applied = False
 
-            # 1. Try Local Kokoro TTS (best quality with exact-fit)
+            # 1. Try Local Kokoro TTS (best quality with exact-fit and automatic voice selection)
             local_kokoro = LocalKokoroService()
             if local_kokoro.is_available():
-                logger.info("[TTS] Using Local Kokoro TTS with exact-fit...")
+                logger.info("[TTS] Using Local Kokoro TTS with auto voice selection...")
                 try:
                     result = local_kokoro.generate_voiceover(
                         text=script,
                         voice_type=voice_type,
                         project_id=project_id,
-                        target_duration=target_duration
+                        target_duration=target_duration,
+                        tone=tone  # Pass tone for automatic voice matching
                     )
                     audio_path = result['audio_path']
                     actual_duration = result['actual_duration']
@@ -3207,6 +3323,7 @@ def register_routes(app, limiter):
                     'path': str(audio_path),
                     'voice': voice_type,
                     'voiceUsed': voice_used,
+                    'tone': tone,  # Tone used for automatic voice selection
                     'actualDuration': actual_duration,
                     'targetDuration': target_duration,
                     'speedAdjusted': speed_adjusted,
@@ -3216,6 +3333,7 @@ def register_routes(app, limiter):
                 atomic_write_json(script_path, project_data)
 
             logger.info(f"[OK] Voiceover generated: {audio_path}, "
+                       f"voice={voice_used}, tone={tone}, "
                        f"duration={actual_duration:.1f}s/{target_duration}s, "
                        f"adjusted={speed_adjusted}, exact_fit={exact_fit_applied}")
 
@@ -3853,6 +3971,18 @@ def register_routes(app, limiter):
                 }
                 atomic_write_json(script_path, project_data)
 
+            # Update database with final video URL (for My Videos page)
+            try:
+                try:
+                    from database import update_video_job
+                except ImportError:
+                    from backend.database import update_video_job
+                # Update video job with the final composed video URL
+                update_video_job(project_id, 'completed', video_url)
+                logger.info(f"[DB] Updated video job {project_id} with final URL: {video_url}")
+            except Exception as db_error:
+                logger.warning(f"[DB] Could not update video job URL: {db_error}")
+
             logger.info(f"[OK] Video composed: {video_path}, duration={actual_duration}s")
 
             return jsonify(ApiResponse(
@@ -3911,6 +4041,18 @@ def register_routes(app, limiter):
 
             video_url = f"/api/{API_VERSION}/videos/{project_id}/captioned.mp4"
 
+            # Update database with captioned video URL (for My Videos page)
+            try:
+                try:
+                    from database import update_video_job
+                except ImportError:
+                    from backend.database import update_video_job
+                # Update video job with the captioned video URL
+                update_video_job(project_id, 'completed', video_url)
+                logger.info(f"[DB] Updated video job {project_id} with captioned URL: {video_url}")
+            except Exception as db_error:
+                logger.warning(f"[DB] Could not update video job URL: {db_error}")
+
             logger.info(f"[OK] Captions added: {video_path}")
 
             return jsonify(ApiResponse(
@@ -3929,6 +4071,763 @@ def register_routes(app, limiter):
                 error=str(e),
                 error_code="CAPTION_FAILED",
                 request_id=g.request_id
+            ).to_dict()), 500
+
+    # === USER VIDEOS API (for My Videos page) ===
+    @app.route(f'/api/{API_VERSION}/auth/user/videos', methods=['GET'])
+    @limiter.limit("30 per minute")
+    @require_auth
+    def get_user_videos_api():
+        """Get user's generated videos for My Videos page"""
+        try:
+            from database import get_user_videos, get_retention_setting
+        except ImportError:
+            from backend.database import get_user_videos, get_retention_setting
+
+        try:
+            user_id = g.current_user.get('id')
+            if not user_id:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="User not authenticated",
+                    error_code="AUTH_REQUIRED",
+                    request_id=g.request_id
+                ).to_dict()), 401
+
+            videos = get_user_videos(user_id)
+            retention_days = get_retention_setting()
+
+            # Transform video data for frontend
+            video_list = []
+            for v in videos:
+                video_list.append({
+                    'id': v['id'],
+                    'prompt': v.get('prompt', ''),
+                    'duration': v.get('duration', 5),
+                    'video_url': v.get('video_url', ''),
+                    'thumbnail_url': v.get('thumbnail_url'),
+                    'created_at': v.get('created_at'),
+                    'expires_at': v.get('expires_at'),
+                    'status': v.get('status', 'completed')
+                })
+
+            logger.info(f"[MY_VIDEOS] User {user_id} has {len(video_list)} videos")
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={
+                    'videos': video_list,
+                    'retention_days': retention_days,
+                    'total': len(video_list)
+                },
+                request_id=g.request_id
+            ).to_dict()), 200
+
+        except Exception as e:
+            logger.error(f"Get user videos error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e),
+                error_code="FETCH_FAILED",
+                request_id=g.request_id
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/auth/user/videos/<video_id>', methods=['DELETE'])
+    @limiter.limit("10 per minute")
+    @require_auth
+    def delete_user_video(video_id):
+        """Delete a user's video"""
+        try:
+            from database import soft_delete_video
+        except ImportError:
+            from backend.database import soft_delete_video
+
+        try:
+            user_id = g.current_user.get('id')
+            if not user_id:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="User not authenticated",
+                    error_code="AUTH_REQUIRED",
+                    request_id=g.request_id
+                ).to_dict()), 401
+
+            success = soft_delete_video(video_id, user_id)
+
+            if success:
+                logger.info(f"[MY_VIDEOS] User {user_id} deleted video {video_id}")
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'deleted': True},
+                    request_id=g.request_id
+                ).to_dict()), 200
+            else:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Video not found or not owned by user",
+                    error_code="NOT_FOUND",
+                    request_id=g.request_id
+                ).to_dict()), 404
+
+        except Exception as e:
+            logger.error(f"Delete video error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e),
+                error_code="DELETE_FAILED",
+                request_id=g.request_id
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/auth/user/credits', methods=['GET'])
+    @limiter.limit("30 per minute")
+    @require_auth
+    def get_user_credits_api():
+        """Get user's credit balance"""
+        try:
+            from database import get_user_credits
+        except ImportError:
+            from backend.database import get_user_credits
+
+        try:
+            user_id = g.current_user.get('id')
+            if not user_id:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="User not authenticated",
+                    error_code="AUTH_REQUIRED",
+                    request_id=g.request_id
+                ).to_dict()), 401
+
+            credits = get_user_credits(user_id)
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=credits,
+                request_id=g.request_id
+            ).to_dict()), 200
+
+        except Exception as e:
+            logger.error(f"Get credits error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e),
+                error_code="FETCH_FAILED",
+                request_id=g.request_id
+            ).to_dict()), 500
+
+    # ==========================================================================
+    # ADMIN API ENDPOINTS
+    # ==========================================================================
+
+    def require_admin(f):
+        """Decorator to require admin role"""
+        @wraps(f)
+        def decorated(*args, **kwargs):
+            if not hasattr(g, 'current_user') or not g.current_user:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Authentication required",
+                    error_code="AUTH_REQUIRED"
+                ).to_dict()), 401
+            if g.current_user.get('role') not in ['admin', 'superadmin']:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Admin access required",
+                    error_code="ADMIN_REQUIRED"
+                ).to_dict()), 403
+            return f(*args, **kwargs)
+        return decorated
+
+    @app.route(f'/api/{API_VERSION}/admin/stats', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_stats():
+        """Get admin dashboard statistics"""
+        try:
+            from database import get_admin_stats
+        except ImportError:
+            from backend.database import get_admin_stats
+
+        try:
+            stats = get_admin_stats()
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={
+                    'total_users': stats.get('total_users', 0),
+                    'total_videos': stats.get('total_videos', 0),
+                    'total_credits_issued': stats.get('total_credits_given', 0),
+                    'active_today': stats.get('active_users', 0),
+                    'completed_videos': stats.get('completed_videos', 0),
+                    'videos_today': stats.get('videos_today', 0)
+                }
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin stats error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/users', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_list_users():
+        """List all users with credits"""
+        try:
+            from database import get_all_users_with_credits
+        except ImportError:
+            from backend.database import get_all_users_with_credits
+
+        try:
+            users = get_all_users_with_credits()
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={
+                    'users': [{
+                        'id': u['id'],
+                        'email': u['email'],
+                        'name': u.get('name', ''),
+                        'role': u['role'],
+                        'credits': u.get('credits_balance', 0),
+                        'credits_used': u.get('credits_used', 0),
+                        'credits_given': u.get('credits_given', 0),
+                        'video_count': u.get('video_count', 0),
+                        'created_at': u.get('created_at'),
+                        'last_login': u.get('last_login'),
+                        'is_active': True
+                    } for u in users],
+                    'total': len(users)
+                }
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin list users error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/users/<user_id>', methods=['GET', 'DELETE'])
+    @require_auth
+    @require_admin
+    def admin_user_detail(user_id):
+        """Get user details or delete user"""
+        try:
+            from database import (get_user_by_id, get_user_credits, get_credit_history,
+                                get_user_videos, delete_user, log_audit)
+        except ImportError:
+            from backend.database import (get_user_by_id, get_user_credits, get_credit_history,
+                                        get_user_videos, delete_user, log_audit)
+
+        try:
+            if request.method == 'DELETE':
+                success = delete_user(user_id)
+                if success:
+                    log_audit(g.current_user['id'], g.current_user['email'],
+                             'delete_user', 'user', user_id, f"Deleted user {user_id}")
+                    return jsonify(ApiResponse(
+                        status=ResponseStatus.SUCCESS,
+                        data={'deleted': True}
+                    ).to_dict()), 200
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="User not found"
+                ).to_dict()), 404
+
+            # GET user details
+            user = get_user_by_id(user_id)
+            if not user:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="User not found"
+                ).to_dict()), 404
+
+            credits = get_user_credits(user_id)
+            credit_history = get_credit_history(user_id, limit=20)
+            videos = get_user_videos(user_id)
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={
+                    'user': user,
+                    'credits': credits,
+                    'credit_history': credit_history,
+                    'videos': videos
+                }
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin user detail error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/users/<user_id>/credits', methods=['POST'])
+    @require_auth
+    @require_admin
+    def admin_add_credits(user_id):
+        """Add credits to user"""
+        try:
+            from database import add_credits, log_audit
+        except ImportError:
+            from backend.database import add_credits, log_audit
+
+        try:
+            data = request.get_json()
+            amount = data.get('amount', 0)
+            reason = data.get('reason', 'Admin credit grant')
+
+            if amount <= 0:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Amount must be positive"
+                ).to_dict()), 400
+
+            result = add_credits(user_id, amount, reason, g.current_user['id'])
+            log_audit(g.current_user['id'], g.current_user['email'],
+                     'add_credits', 'user', user_id, f"Added {amount} credits: {reason}")
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=result
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin add credits error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/users/<user_id>/role', methods=['PUT'])
+    @require_auth
+    @require_admin
+    def admin_change_role(user_id):
+        """Change user role"""
+        try:
+            from database import update_user_role, log_audit
+        except ImportError:
+            from backend.database import update_user_role, log_audit
+
+        try:
+            data = request.get_json()
+            new_role = data.get('role')
+
+            if new_role not in ['user', 'editor', 'viewer', 'admin', 'api']:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Invalid role"
+                ).to_dict()), 400
+
+            success = update_user_role(user_id, new_role)
+            if success:
+                log_audit(g.current_user['id'], g.current_user['email'],
+                         'change_role', 'user', user_id, f"Changed role to {new_role}")
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'role': new_role}
+                ).to_dict()), 200
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error="User not found"
+            ).to_dict()), 404
+        except Exception as e:
+            logger.error(f"Admin change role error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/videos', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_list_videos():
+        """List all videos"""
+        try:
+            from database import get_all_videos
+        except ImportError:
+            from backend.database import get_all_videos
+
+        try:
+            videos = get_all_videos(limit=100)
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={
+                    'videos': [{
+                        'id': v['id'],
+                        'user_id': v.get('user_id'),
+                        'user_email': v.get('user_email'),
+                        'prompt': v.get('prompt', '')[:100],
+                        'status': v.get('status'),
+                        'output_url': v.get('video_url'),
+                        'created_at': v.get('created_at'),
+                        'completed_at': v.get('completed_at')
+                    } for v in videos],
+                    'total': len(videos)
+                }
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin list videos error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/videos/<video_id>', methods=['DELETE'])
+    @require_auth
+    @require_admin
+    def admin_delete_video(video_id):
+        """Delete a video"""
+        try:
+            from database import delete_video, log_audit
+        except ImportError:
+            from backend.database import delete_video, log_audit
+
+        try:
+            success = delete_video(video_id)
+            if success:
+                log_audit(g.current_user['id'], g.current_user['email'],
+                         'delete_video', 'video', video_id, f"Deleted video {video_id}")
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'deleted': True}
+                ).to_dict()), 200
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error="Video not found"
+            ).to_dict()), 404
+        except Exception as e:
+            logger.error(f"Admin delete video error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/analytics', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_analytics():
+        """Get analytics data for charts"""
+        try:
+            from database import get_analytics_data
+        except ImportError:
+            from backend.database import get_analytics_data
+
+        try:
+            days = request.args.get('days', 30, type=int)
+            data = get_analytics_data(days)
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=data
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin analytics error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/settings', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_get_settings():
+        """Get all system settings"""
+        try:
+            from database import get_all_settings
+        except ImportError:
+            from backend.database import get_all_settings
+
+        try:
+            settings = get_all_settings()
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=settings
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin get settings error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/settings/<key>', methods=['PUT'])
+    @require_auth
+    @require_admin
+    def admin_update_setting(key):
+        """Update a system setting"""
+        try:
+            from database import update_setting, log_audit
+        except ImportError:
+            from backend.database import update_setting, log_audit
+
+        try:
+            data = request.get_json()
+            value = data.get('value')
+
+            success = update_setting(key, str(value), g.current_user['id'])
+            if success:
+                log_audit(g.current_user['id'], g.current_user['email'],
+                         'update_setting', 'setting', key, f"Changed {key} to {value}")
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'key': key, 'value': value}
+                ).to_dict()), 200
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error="Setting not found"
+            ).to_dict()), 404
+        except Exception as e:
+            logger.error(f"Admin update setting error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/notifications', methods=['GET', 'POST'])
+    @require_auth
+    @require_admin
+    def admin_notifications():
+        """List or create notifications"""
+        try:
+            from database import get_notifications, create_notification, log_audit
+        except ImportError:
+            from backend.database import get_notifications, create_notification, log_audit
+
+        try:
+            if request.method == 'POST':
+                data = request.get_json()
+                notif_id = create_notification(
+                    title=data.get('title'),
+                    message=data.get('message'),
+                    type=data.get('type', 'info'),
+                    target_role='all',
+                    created_by=g.current_user['id'],
+                    expires_at=data.get('expires_at')
+                )
+                log_audit(g.current_user['id'], g.current_user['email'],
+                         'create_notification', 'notification', str(notif_id), data.get('title'))
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'id': notif_id}
+                ).to_dict()), 201
+
+            notifications = get_notifications(include_inactive=True)
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={'notifications': notifications, 'total': len(notifications)}
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin notifications error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/notifications/<int:notif_id>', methods=['DELETE'])
+    @require_auth
+    @require_admin
+    def admin_delete_notification(notif_id):
+        """Delete a notification"""
+        try:
+            from database import delete_notification, log_audit
+        except ImportError:
+            from backend.database import delete_notification, log_audit
+
+        try:
+            success = delete_notification(notif_id)
+            if success:
+                log_audit(g.current_user['id'], g.current_user['email'],
+                         'delete_notification', 'notification', str(notif_id), '')
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.SUCCESS,
+                    data={'deleted': True}
+                ).to_dict()), 200
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error="Notification not found"
+            ).to_dict()), 404
+        except Exception as e:
+            logger.error(f"Admin delete notification error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/tickets', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_list_tickets():
+        """List support tickets"""
+        try:
+            from database import get_all_tickets, get_ticket_stats
+        except ImportError:
+            from backend.database import get_all_tickets, get_ticket_stats
+
+        try:
+            status_filter = request.args.get('status')
+            tickets = get_all_tickets(status=status_filter)
+            stats = get_ticket_stats()
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={'tickets': tickets, 'stats': stats, 'total': len(tickets)}
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin list tickets error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/tickets/<int:ticket_id>', methods=['GET', 'PUT'])
+    @require_auth
+    @require_admin
+    def admin_ticket_detail(ticket_id):
+        """Get or update ticket"""
+        try:
+            from database import get_ticket_by_id, update_ticket, log_audit
+        except ImportError:
+            from backend.database import get_ticket_by_id, update_ticket, log_audit
+
+        try:
+            if request.method == 'PUT':
+                data = request.get_json()
+                success = update_ticket(
+                    ticket_id,
+                    status=data.get('status'),
+                    priority=data.get('priority'),
+                    assigned_to=data.get('assigned_to'),
+                    admin_notes=data.get('admin_notes')
+                )
+                if success:
+                    log_audit(g.current_user['id'], g.current_user['email'],
+                             'update_ticket', 'ticket', str(ticket_id), f"Status: {data.get('status')}")
+                    return jsonify(ApiResponse(
+                        status=ResponseStatus.SUCCESS,
+                        data={'updated': True}
+                    ).to_dict()), 200
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Ticket not found"
+                ).to_dict()), 404
+
+            ticket = get_ticket_by_id(ticket_id)
+            if not ticket:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Ticket not found"
+                ).to_dict()), 404
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=ticket
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin ticket detail error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/tickets/<int:ticket_id>/reply', methods=['POST'])
+    @require_auth
+    @require_admin
+    def admin_ticket_reply(ticket_id):
+        """Add reply to ticket"""
+        try:
+            from database import add_ticket_reply, log_audit
+        except ImportError:
+            from backend.database import add_ticket_reply, log_audit
+
+        try:
+            data = request.get_json()
+            message = data.get('message')
+
+            if not message:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Message required"
+                ).to_dict()), 400
+
+            reply_id = add_ticket_reply(ticket_id, g.current_user['id'], message, is_admin=True)
+            log_audit(g.current_user['id'], g.current_user['email'],
+                     'reply_ticket', 'ticket', str(ticket_id), 'Admin reply added')
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={'reply_id': reply_id}
+            ).to_dict()), 201
+        except Exception as e:
+            logger.error(f"Admin ticket reply error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/audit-logs', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_audit_logs():
+        """Get audit logs"""
+        try:
+            from database import get_audit_logs, get_audit_log_count
+        except ImportError:
+            from backend.database import get_audit_logs, get_audit_log_count
+
+        try:
+            limit = request.args.get('limit', 100, type=int)
+            offset = request.args.get('offset', 0, type=int)
+            action_filter = request.args.get('action')
+
+            logs = get_audit_logs(limit=limit, offset=offset, action=action_filter)
+            total = get_audit_log_count(action=action_filter)
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data={'logs': logs, 'total': total}
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin audit logs error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
+            ).to_dict()), 500
+
+    @app.route(f'/api/{API_VERSION}/admin/export/<export_type>', methods=['GET'])
+    @require_auth
+    @require_admin
+    def admin_export(export_type):
+        """Export data as JSON (frontend converts to CSV)"""
+        try:
+            from database import export_users_data, export_transactions_data, export_videos_data, log_audit
+        except ImportError:
+            from backend.database import export_users_data, export_transactions_data, export_videos_data, log_audit
+
+        try:
+            days = request.args.get('days', 30, type=int)
+
+            if export_type == 'users':
+                data = export_users_data()
+            elif export_type == 'transactions':
+                data = export_transactions_data(days)
+            elif export_type == 'videos':
+                data = export_videos_data(days)
+            else:
+                return jsonify(ApiResponse(
+                    status=ResponseStatus.ERROR,
+                    error="Invalid export type"
+                ).to_dict()), 400
+
+            log_audit(g.current_user['id'], g.current_user['email'],
+                     'export_data', 'export', export_type, f"Exported {len(data)} records")
+
+            return jsonify(ApiResponse(
+                status=ResponseStatus.SUCCESS,
+                data=data
+            ).to_dict()), 200
+        except Exception as e:
+            logger.error(f"Admin export error: {e}")
+            return jsonify(ApiResponse(
+                status=ResponseStatus.ERROR,
+                error=str(e)
             ).to_dict()), 500
 
     # === DOWNLOAD VIDEO ===

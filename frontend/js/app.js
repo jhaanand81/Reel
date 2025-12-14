@@ -1294,6 +1294,11 @@ class UIController {
         // Update state
         this.state.setState({ currentStage: stageNumber });
 
+        // If going to Stage 2 and no script exists, auto-generate it
+        if (stageNumber === 2 && !this.state.state.projectData.script) {
+            this.generateScript();
+        }
+
         // If going to Stage 3, copy script preview and reset UI
         if (stageNumber === 3) {
             const scriptPreview = document.getElementById('scriptPreview');
@@ -2006,10 +2011,16 @@ class UIController {
             });
 
             if (response.status === 'success') {
+                // Update video preview
                 if (this.elements.previewVideo) {
                     this.elements.previewVideo.src = response.data.videoUrl;
                 }
-                this.showNotification('Captions added!', 'success');
+                // Save captioned video URL to state for download/view
+                this.state.updateProject({
+                    videoUrl: response.data.videoUrl,
+                    hasCaptions: true
+                });
+                this.showNotification('Captions added successfully!', 'success');
             }
         } catch (error) {
             this.handleError(error, 'Failed to add captions');
@@ -2144,18 +2155,26 @@ class UIController {
     }
 
     /**
-     * View video
+     * View video in browser
      */
     viewVideo() {
-        const { videoUrl } = this.state.state.projectData;
+        const { videoUrl, projectId } = this.state.state.projectData;
 
         if (!videoUrl) {
             this.showNotification('No video available', 'warning');
             return;
         }
 
-        window.open(videoUrl, '_blank');
-        this.showNotification('Opening video in new tab...', 'info');
+        // Build full URL for viewing
+        let fullUrl = videoUrl;
+
+        // If it's a relative URL, make it absolute
+        if (videoUrl.startsWith('/')) {
+            fullUrl = window.location.origin + videoUrl;
+        }
+
+        // Open video in new tab (no echo notification needed)
+        window.open(fullUrl, '_blank');
     }
 
     /**

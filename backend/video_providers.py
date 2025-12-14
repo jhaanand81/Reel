@@ -42,14 +42,14 @@ class ReplicateService(VideoProviderBase):
         self.api_key = os.getenv('REPLICATE_API_TOKEN')
         self.base_url = "https://api.replicate.com/v1"
 
-        # WAN 2.2 models by resolution (NO voice - allows custom voiceover)
+        # WAN models - correct Replicate model names (2025)
         self.models_by_resolution = {
-            "480p": "wan-video/wan-2.2-t2v-480p",
-            "720p": "wan-video/wan-2.2-t2v-720p",
-            "1080p": "wan-video/wan-2.2-t2v-1080p"
+            "480p": "wan-video/wan-2.2-t2v-fast",
+            "720p": "wan-video/wan-2.5-t2v-fast",
+            "1080p": "wan-video/wan-2.5-t2v-fast"
         }
-        self.model_i2v = "wan-video/wan-2.1-i2v-720p"  # Image-to-video
-        self.resolution = "1080p"  # Default resolution
+        self.model_i2v = "wan-video/wan-2.2-i2v-fast"  # Image-to-video
+        self.resolution = "480p"  # Default to fast 480p model
 
     def _get_model_for_resolution(self, resolution: str) -> str:
         """Get the appropriate WAN 2.2 model for the requested resolution"""
@@ -97,17 +97,27 @@ class ReplicateService(VideoProviderBase):
         model = self._get_model_for_resolution(res)
         logger.info(f"[CLIP {clip_index+1}] Using model: {model}, resolution: {res}")
 
+        # Resolution dimensions (9:16 vertical for reels)
+        resolution_map = {
+            "480p": {"width": 480, "height": 854},
+            "720p": {"width": 720, "height": 1280},
+            "1080p": {"width": 1080, "height": 1920}
+        }
+        dims = resolution_map.get(res, resolution_map["480p"])
+
         payload = {
-            "version": model,
             "input": {
                 "prompt": prompt,
-                "num_frames": 81,  # ~5 seconds at 16fps
-                "sample_steps": 30
+                "width": dims["width"],
+                "height": dims["height"]
             }
         }
 
         try:
-            r = requests.post(f"{self.base_url}/predictions", headers=headers, json=payload, timeout=60)
+            # Use models endpoint for community models (e.g., wan-video/wan-2.2-t2v-1080p)
+            url = f"{self.base_url}/models/{model}/predictions"
+            logger.info(f"[CLIP {clip_index+1}] POST {url}")
+            r = requests.post(url, headers=headers, json=payload, timeout=60)
             r.raise_for_status()
             data = r.json()
             return {
@@ -394,6 +404,211 @@ class ReplicateService(VideoProviderBase):
                 "progress": progress
             }
 
+class RunPodService(VideoProviderBase):
+    """Video generation using RunPod Serverless with WAN 2.2
+
+    Requires:
+    - RUNPOD_API_KEY: Your RunPod API key
+    - RUNPOD_ENDPOINT_ID: Your serverless endpoint ID
+    """
+
+    def __init__(self):
+        self.api_key = os.getenv('RUNPOD_API_KEY')
+        self.endpoint_id = os.getenv('RUNPOD_ENDPOINT_ID')
+        self.base_url = f"https://api.runpod.ai/v2/{self.endpoint_id}" if self.endpoint_id else None
+        self.active_jobs = {}
+
+    @property
+    def provider_name(self): return "runpod"
+
+    @property
+    def max_single_clip_duration(self): return 5
+
+    def is_available(self):
+        return bool(self.api_key and self.endpoint_id)
+
+    def generate_video(self, prompt, duration=5, **kwargs):
+        """Start video generation on RunPod"""
+        if not self.is_available():
+            raise Exception("RunPod API key or endpoint ID not configured")
+
+        clip_duration = self.max_single_clip_duration
+        clips_needed = max(1, (duration + clip_duration - 1) // clip_duration)
+
+        # Get resolution from kwargs
+        resolution = kwargs.get('resolution', '480p')
+        valid_resolutions = ["480p", "720p", "1080p"]
+        if resolution not in valid_resolutions:
+            resolution = "480p"
+
+        # Resolution dimensions (9:16 vertical for reels)
+        resolution_map = {
+            "480p": {"width": 480, "height": 854},
+            "720p": {"width": 720, "height": 1280},
+            "1080p": {"width": 1080, "height": 1920}
+        }
+        dims = resolution_map.get(resolution, resolution_map["480p"])
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        # RunPod serverless payload
+        payload = {
+            "input": {
+                "prompt": prompt[:MAX_PROMPT_LENGTH],
+                "num_frames": 81,  # ~5 seconds at 16fps
+                "width": dims["width"],
+                "height": dims["height"],
+                "resolution": resolution,
+                "fps": DEFAULT_FPS,
+                "duration": duration,
+                "clips_needed": clips_needed
+            }
+        }
+
+        try:
+            logger.info(f"[RUNPOD] Starting video generation: {duration}s, {resolution}")
+            response = requests.post(
+                f"{self.base_url}/run",
+                headers=headers,
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            job_id = data.get('id')
+
+            if not job_id:
+                raise Exception("No job ID returned from RunPod")
+
+            # Track job
+            self.active_jobs[job_id] = {
+                "prompt": prompt[:100],
+                "duration": duration,
+                "clips_needed": clips_needed,
+                "created_at": time.time()
+            }
+
+            logger.info(f"[RUNPOD] Job started: {job_id}")
+
+            return {
+                "job_id": job_id,
+                "provider": "runpod",
+                "status": "starting",
+                "clips_needed": clips_needed,
+                "clip_duration": clip_duration,
+                "target_duration": duration,
+                "multi_clip": clips_needed > 1
+            }
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"RunPod API error: {str(e)}")
+
+    def check_status(self, job_id):
+        """Check status of a RunPod video generation job"""
+        if not self.is_available():
+            raise Exception("RunPod API not configured")
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+        try:
+            response = requests.get(
+                f"{self.base_url}/status/{job_id}",
+                headers=headers,
+                timeout=30
+            )
+            response.raise_for_status()
+
+            data = response.json()
+            runpod_status = data.get('status', 'UNKNOWN')
+
+            result = {
+                "job_id": job_id,
+                "status": self._map_status(runpod_status),
+                "progress": self._calculate_progress(runpod_status)
+            }
+
+            # Handle completed job
+            if runpod_status == 'COMPLETED':
+                output = data.get('output', {})
+
+                # Handle video URL or base64
+                if 'video_url' in output:
+                    result['videoUrl'] = output['video_url']
+                elif 'video_base64' in output:
+                    result['videoUrl'] = self._save_video_from_base64(output['video_base64'], job_id)
+                elif 'videoUrl' in output:
+                    result['videoUrl'] = output['videoUrl']
+
+                # Handle multiple clips
+                if 'video_urls' in output:
+                    result['videoUrls'] = output['video_urls']
+                    result['multi_clip'] = True
+
+                result['progress'] = 100
+                self.active_jobs.pop(job_id, None)
+
+            elif runpod_status == 'FAILED':
+                result['error'] = data.get('error', 'Video generation failed')
+                self.active_jobs.pop(job_id, None)
+
+            return result
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"RunPod status check error: {str(e)}")
+
+    def _save_video_from_base64(self, video_base64: str, job_id: str) -> str:
+        """Save base64 video to file and return URL"""
+        try:
+            video_bytes = base64.b64decode(video_base64)
+
+            output_dir = Path("output/videos")
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            filename = f"runpod_{job_id}.mp4"
+            filepath = output_dir / filename
+
+            with open(filepath, 'wb') as f:
+                f.write(video_bytes)
+
+            logger.info(f"[RUNPOD] Saved video: {filepath}")
+            return f"/output/videos/{filename}"
+
+        except Exception as e:
+            logger.error(f"[RUNPOD] Failed to save video: {e}")
+            raise
+
+    def _map_status(self, runpod_status: str) -> str:
+        """Map RunPod status to our status"""
+        status_map = {
+            'IN_QUEUE': 'pending',
+            'IN_PROGRESS': 'processing',
+            'COMPLETED': 'completed',
+            'FAILED': 'failed',
+            'CANCELLED': 'failed',
+            'TIMED_OUT': 'failed'
+        }
+        return status_map.get(runpod_status, 'pending')
+
+    def _calculate_progress(self, runpod_status: str) -> int:
+        """Calculate progress percentage"""
+        progress_map = {
+            'IN_QUEUE': 10,
+            'IN_PROGRESS': 50,
+            'COMPLETED': 100,
+            'FAILED': 0,
+            'CANCELLED': 0,
+            'TIMED_OUT': 0
+        }
+        return progress_map.get(runpod_status, 0)
+
+
 class DemoService(VideoProviderBase):
     @property
     def provider_name(self): return "demo"
@@ -424,12 +639,33 @@ class DemoService(VideoProviderBase):
 
 class VideoProviderFactory:
     def __init__(self):
-        self._providers = {'demo': DemoService(), 'replicate': ReplicateService()}
+        self._providers = {
+            'demo': DemoService(),
+            'replicate': ReplicateService(),
+            'runpod': RunPodService()
+        }
+
     def get_provider(self, name=None):
+        """Get video provider by name or from VIDEO_PROVIDER env var
+
+        Provider switching:
+        - Set VIDEO_PROVIDER=replicate and REPLICATE_API_TOKEN for Replicate
+        - Set VIDEO_PROVIDER=runpod and RUNPOD_API_KEY + RUNPOD_ENDPOINT_ID for RunPod
+        - Defaults to 'demo' if provider not available
+        """
         name = (name or os.getenv('VIDEO_PROVIDER', 'demo')).lower().replace('-', '_')
-        if name in self._providers and self._providers[name].is_available():
-            return self._providers[name]
+        logger.info(f"[PROVIDER] Requested: {name}")
+
+        if name in self._providers:
+            provider = self._providers[name]
+            if provider.is_available():
+                logger.info(f"[PROVIDER] Using: {name}")
+                return provider
+            else:
+                logger.warning(f"[PROVIDER] {name} not available, falling back to demo")
+
         return self._providers['demo']
+
     def list_available_providers(self):
         return [{"name": n, "available": p.is_available()} for n, p in self._providers.items()]
 

@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
+# Create required directories for outputs and data
+RUN mkdir -p /app/backend/outputs/videos /app/backend/outputs/audio /app/backend/outputs/scripts /app/backend/data
+
+# Set permissions
+RUN chmod -R 777 /app/backend/outputs /app/backend/data
+
 # Expose port
 EXPOSE 5000
 
