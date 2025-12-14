@@ -109,7 +109,8 @@ class ReplicateService(VideoProviderBase):
             "input": {
                 "prompt": prompt,
                 "width": dims["width"],
-                "height": dims["height"]
+                "height": dims["height"],
+                "aspect_ratio": "9:16"  # Vertical for reels/shorts
             }
         }
 

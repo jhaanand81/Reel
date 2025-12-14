@@ -1,0 +1,38 @@
+[Script Info]
+Title: Viral Captions
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Main,Arial,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,4,2,40,40,150,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:00.23,Main,,0,0,0,,{\c&H00FFFF&}the{\c&HFFFFFF&} Majestic Himalayas Rise
+Dialogue: 0,0:00:00.23,0:00:00.84,Main,,0,0,0,,the {\c&H00FFFF&}Majestic{\c&HFFFFFF&} Himalayas Rise
+Dialogue: 0,0:00:00.84,0:00:01.54,Main,,0,0,0,,the Majestic {\c&H00FFFF&}Himalayas{\c&HFFFFFF&} Rise
+Dialogue: 0,0:00:01.54,0:00:01.85,Main,,0,0,0,,the Majestic Himalayas {\c&H00FFFF&}Rise{\c&HFFFFFF&}
+Dialogue: 0,0:00:01.85,0:00:02.23,Main,,0,0,0,,{\c&H00FFFF&}Above{\c&HFFFFFF&} the Clouds.
+Dialogue: 0,0:00:02.23,0:00:02.46,Main,,0,0,0,,Above {\c&H00FFFF&}the{\c&HFFFFFF&} Clouds.
+Dialogue: 0,0:00:02.46,0:00:03.00,Main,,0,0,0,,Above the {\c&H00FFFF&}Clouds.{\c&HFFFFFF&}
+Dialogue: 0,0:00:03.00,0:00:03.54,Main,,0,0,0,,{\c&H00FFFF&}Ancient{\c&HFFFFFF&} Peaks Touch the
+Dialogue: 0,0:00:03.54,0:00:03.93,Main,,0,0,0,,Ancient {\c&H00FFFF&}Peaks{\c&HFFFFFF&} Touch the
+Dialogue: 0,0:00:03.93,0:00:04.31,Main,,0,0,0,,Ancient Peaks {\c&H00FFFF&}Touch{\c&HFFFFFF&} the
+Dialogue: 0,0:00:04.31,0:00:04.54,Main,,0,0,0,,Ancient Peaks Touch {\c&H00FFFF&}the{\c&HFFFFFF&}
+Dialogue: 0,0:00:04.54,0:00:05.16,Main,,0,0,0,,{\c&H00FFFF&}Heavens.{\c&HFFFFFF&}
+Dialogue: 0,0:00:05.16,0:00:06.01,Main,,0,0,0,,{\c&H00FFFF&}Snow-capped{\c&HFFFFFF&} Mountains Stretch Across
+Dialogue: 0,0:00:06.01,0:00:06.70,Main,,0,0,0,,Snow-capped {\c&H00FFFF&}Mountains{\c&HFFFFFF&} Stretch Across
+Dialogue: 0,0:00:06.70,0:00:07.24,Main,,0,0,0,,Snow-capped Mountains {\c&H00FFFF&}Stretch{\c&HFFFFFF&} Across
+Dialogue: 0,0:00:07.24,0:00:07.70,Main,,0,0,0,,Snow-capped Mountains Stretch {\c&H00FFFF&}Across{\c&HFFFFFF&}
+Dialogue: 0,0:00:07.70,0:00:07.94,Main,,0,0,0,,{\c&H00FFFF&}the{\c&HFFFFFF&} Horizon.
+Dialogue: 0,0:00:07.94,0:00:08.55,Main,,0,0,0,,the {\c&H00FFFF&}Horizon.{\c&HFFFFFF&}
+Dialogue: 0,0:00:08.55,0:00:08.63,Main,,0,0,0,,{\c&H00FFFF&}a{\c&HFFFFFF&} Place of Wonder
+Dialogue: 0,0:00:08.63,0:00:09.02,Main,,0,0,0,,a {\c&H00FFFF&}Place{\c&HFFFFFF&} of Wonder
+Dialogue: 0,0:00:09.02,0:00:09.17,Main,,0,0,0,,a Place {\c&H00FFFF&}of{\c&HFFFFFF&} Wonder
+Dialogue: 0,0:00:09.17,0:00:09.63,Main,,0,0,0,,a Place of {\c&H00FFFF&}Wonder{\c&HFFFFFF&}
+Dialogue: 0,0:00:09.63,0:00:09.86,Main,,0,0,0,,{\c&H00FFFF&}and{\c&HFFFFFF&} Timeless Beauty.
+Dialogue: 0,0:00:09.86,0:00:10.48,Main,,0,0,0,,and {\c&H00FFFF&}Timeless{\c&HFFFFFF&} Beauty.
+Dialogue: 0,0:00:10.48,0:00:11.02,Main,,0,0,0,,and Timeless {\c&H00FFFF&}Beauty.{\c&HFFFFFF&}

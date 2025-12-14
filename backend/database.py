@@ -1,6 +1,12 @@
 """
 SQLite Database Module for Reel Sense
-Lightweight persistent storage for users and sessions
+Production-ready persistent storage with WAL mode for concurrent access
+
+RAILWAY DEPLOYMENT:
+- Requires Railway Volume mounted at /app/backend/data
+- Configure in Railway Dashboard: Settings → Volumes → Add Volume
+- Mount path: /app/backend/data
+- Size: 1GB minimum recommended
 """
 
 import sqlite3
@@ -13,23 +19,105 @@ from typing import Optional, Dict, Any, List
 from contextlib import contextmanager
 import threading
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
-# Database path
+# Database path - Railway volume should be mounted at /app/backend/data
 DB_PATH = Path(os.getenv('DATABASE_PATH', 'data/reelsense.db'))
 API_KEY_PREFIX = 'rsk_'
 
 # Thread-local storage for connections
 _local = threading.local()
+_db_initialized = False
 
 def get_db_connection() -> sqlite3.Connection:
-    """Get thread-local database connection"""
+    """Get thread-local database connection with WAL mode for concurrency"""
     if not hasattr(_local, 'connection') or _local.connection is None:
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        _local.connection = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+        _local.connection = sqlite3.connect(
+            str(DB_PATH),
+            check_same_thread=False,
+            timeout=30.0  # 30 second timeout for busy database
+        )
         _local.connection.row_factory = sqlite3.Row
+
+        # Enable WAL mode for better concurrent read/write performance
+        # WAL mode is persistent - only needs to be set once per database file
+        _local.connection.execute('PRAGMA journal_mode=WAL')
+        _local.connection.execute('PRAGMA synchronous=NORMAL')  # Faster, still safe
+        _local.connection.execute('PRAGMA cache_size=-64000')  # 64MB cache
+        _local.connection.execute('PRAGMA busy_timeout=30000')  # 30 second busy timeout
+
+        logger.info(f"[DB] Connected to {DB_PATH} (WAL mode enabled)")
     return _local.connection
+
+
+def check_database_health() -> Dict[str, Any]:
+    """Check database health and return status"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check if database is accessible
+        cursor.execute("SELECT 1")
+
+        # Get database info
+        cursor.execute("PRAGMA journal_mode")
+        journal_mode = cursor.fetchone()[0]
+
+        cursor.execute("PRAGMA page_count")
+        page_count = cursor.fetchone()[0]
+
+        cursor.execute("PRAGMA page_size")
+        page_size = cursor.fetchone()[0]
+
+        db_size_mb = (page_count * page_size) / (1024 * 1024)
+
+        # Count records
+        cursor.execute("SELECT COUNT(*) FROM users")
+        user_count = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM video_jobs")
+        video_count = cursor.fetchone()[0]
+
+        return {
+            'healthy': True,
+            'path': str(DB_PATH),
+            'exists': DB_PATH.exists(),
+            'journal_mode': journal_mode,
+            'size_mb': round(db_size_mb, 2),
+            'user_count': user_count,
+            'video_count': video_count
+        }
+    except Exception as e:
+        logger.error(f"[DB] Health check failed: {e}")
+        return {
+            'healthy': False,
+            'error': str(e),
+            'path': str(DB_PATH)
+        }
+
+
+def backup_database(backup_path: str = None) -> Optional[str]:
+    """Create a backup of the database using SQLite's online backup API"""
+    try:
+        if backup_path is None:
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            backup_path = str(DB_PATH.parent / f"reelsense_backup_{timestamp}.db")
+
+        source = get_db_connection()
+        dest = sqlite3.connect(backup_path)
+
+        # Use SQLite's backup API (safe for concurrent access)
+        source.backup(dest)
+        dest.close()
+
+        logger.info(f"[DB] Backup created: {backup_path}")
+        return backup_path
+    except Exception as e:
+        logger.error(f"[DB] Backup failed: {e}")
+        return None
 
 @contextmanager
 def get_db():

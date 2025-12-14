@@ -1,1 +1,1 @@
-web: gunicorn --chdir backend --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300 main:app
+web: gunicorn --chdir backend --bind 0.0.0.0:$PORT --workers ${GUNICORN_WORKERS:-4} --threads ${GUNICORN_THREADS:-8} --worker-class gthread --timeout 300 --graceful-timeout 30 --keep-alive 5 --max-requests 1000 --max-requests-jitter 50 --access-logfile - --error-logfile - --log-level info main:app

@@ -1,0 +1,27 @@
+[Script Info]
+Title: Viral Captions
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Main,Arial Black,72,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,4,2,2,50,50,200,1
+Style: Highlight,Arial Black,80,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,5,3,2,50,50,200,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:01.06,Highlight,,0,0,0,,{\fad(100,100)}The majestic Himalayas
+Dialogue: 0,0:00:01.06,0:00:02.13,Main,,0,0,0,,{\fad(100,100)}rise above the
+Dialogue: 0,0:00:02.13,0:00:03.20,Main,,0,0,0,,{\fad(100,100)}clouds, where
+Dialogue: 0,0:00:03.20,0:00:04.27,Highlight,,0,0,0,,{\fad(100,100)}ancient peaks touch
+Dialogue: 0,0:00:04.27,0:00:05.34,Main,,0,0,0,,{\fad(100,100)}the heavens.
+Dialogue: 0,0:00:05.34,0:00:06.41,Main,,0,0,0,,{\fad(100,100)}Snow-capped mountains stretch
+Dialogue: 0,0:00:06.41,0:00:07.48,Highlight,,0,0,0,,{\fad(100,100)}endlessly across the
+Dialogue: 0,0:00:07.48,0:00:08.55,Main,,0,0,0,,{\fad(100,100)}horizon. A
+Dialogue: 0,0:00:08.55,0:00:09.62,Main,,0,0,0,,{\fad(100,100)}place of wonder
+Dialogue: 0,0:00:09.62,0:00:10.69,Highlight,,0,0,0,,{\fad(100,100)}, mystery,
+Dialogue: 0,0:00:10.69,0:00:11.76,Main,,0,0,0,,{\fad(100,100)}and timeless beauty
+Dialogue: 0,0:00:11.76,0:00:12.83,Main,,0,0,0,,{\fad(100,100)}that takes your
+Dialogue: 0,0:00:12.83,0:00:13.89,Highlight,,0,0,0,,{\fad(100,100)}breath away.

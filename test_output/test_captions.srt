@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:02,683
+The majestic Himalayas rise above the clouds,
+
+2
+00:00:02,683 --> 00:00:05,366
+where ancient peaks touch the heavens.
+
+3
+00:00:05,366 --> 00:00:08,050
+A place of wonder and timeless beauty.

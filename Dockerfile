@@ -38,8 +38,29 @@ RUN chmod -R 777 /app/backend/outputs /app/backend/data
 # Expose port
 EXPOSE 5000
 
-# Set environment variable for port
+# Set environment variables for production
 ENV PORT=5000
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# Run the application
-CMD gunicorn --chdir /app/backend --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 300 main:app
+# Gunicorn config (can be overridden via Railway env vars)
+# Default: 4 workers × 8 threads = 32 concurrent handlers
+# For 30-50 concurrent users, 100-200 videos/day
+ENV GUNICORN_WORKERS=4
+ENV GUNICORN_THREADS=8
+ENV FFMPEG_WORKERS=4
+
+# Run the application with production-ready gunicorn config
+CMD gunicorn --chdir /app/backend --bind 0.0.0.0:$PORT \
+    --workers ${GUNICORN_WORKERS} \
+    --threads ${GUNICORN_THREADS} \
+    --worker-class gthread \
+    --timeout 300 \
+    --graceful-timeout 30 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    --access-logfile - \
+    --error-logfile - \
+    --log-level info \
+    main:app

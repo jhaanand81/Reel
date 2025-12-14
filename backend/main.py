@@ -392,23 +392,44 @@ def sanitize_input(text: str, max_length: int = 500) -> str:
 def calculate_word_count(duration: int, length: str = None) -> Tuple[int, int, int]:
     """Calculate exact word count for target duration or script length setting
 
+    PRIORITY: Duration takes precedence for short-form videos (5-30s).
+    This ensures the voiceover fits the exact target duration.
+
     Args:
         duration: Target duration in seconds
-        length: Script length setting ('short', 'medium', 'long')
+        length: Script length setting ('short', 'medium', 'long') - only used for longer videos
 
     Returns: (target_words, min_words, max_words)
+
+    Duration-based word counts (at 2.5 words/second):
+    - 5s  → ~12 words (short punchy hook)
+    - 10s → ~25 words (quick message)
+    - 15s → ~38 words (standard reel)
+    - 30s → ~75 words (detailed reel)
+    - 60s → ~150 words (full story)
     """
-    # PRIORITY: Use length setting if provided (matches UI expectations)
+    # For short-form videos (5-30s), ALWAYS use duration-based calculation
+    # This ensures voiceover fits the exact target duration
+    if duration and duration <= 30:
+        target = int(duration * WORDS_PER_SECOND)
+        # Tighter tolerance for short videos (±3 words)
+        tolerance = 3 if duration <= 15 else WORD_COUNT_TOLERANCE
+        min_words = max(8, target - tolerance)
+        max_words = target + tolerance
+        logging.debug(f"[SCRIPT] Duration-based: {duration}s → {target} words (±{tolerance})")
+        return target, min_words, max_words
+
+    # For longer videos, use length presets if provided
     if length:
         length_word_counts = {
-            'short': (62, 50, 75),      # Short: 50-75 words (avg ~62)
-            'medium': (100, 75, 125),   # Medium: 75-125 words (avg ~100)
-            'long': (162, 125, 200),    # Long: 125-200 words (avg ~162)
+            'short': (75, 60, 90),       # Short: ~30s video
+            'medium': (150, 125, 175),   # Medium: ~60s video
+            'long': (225, 200, 250),     # Long: ~90s video
         }
         if length.lower() in length_word_counts:
             return length_word_counts[length.lower()]
 
-    # Fallback: Calculate from duration
+    # Fallback: Calculate from duration for any other case
     target = int(duration * WORDS_PER_SECOND)
     min_words = max(10, target - WORD_COUNT_TOLERANCE)
     max_words = target + WORD_COUNT_TOLERANCE
@@ -447,12 +468,23 @@ class GroqService:
         topic = sanitize_input(topic, MAX_TOPIC_LENGTH)
         brand = sanitize_input(brand, 100) if brand else ""
 
-        # Calculate EXACT word count based on length setting (short/medium/long)
-        # This takes priority over duration-based calculation
+        # Calculate EXACT word count based on duration (priority for short videos)
         target_words, min_words, max_words = calculate_word_count(duration, length)
 
         # Build prompt with STRICT word count requirement
         brand_context = f"\nBrand/Product: {brand}" if brand else ""
+
+        # Duration-specific style guidance
+        if duration <= 5:
+            style_guide = "Ultra-short hook - ONE powerful statement that grabs attention instantly. No fluff."
+        elif duration <= 10:
+            style_guide = "Quick impact - Start with a hook, deliver one key message. Punchy and memorable."
+        elif duration <= 15:
+            style_guide = "Standard reel - Hook, brief context, memorable closing. Every word must earn its place."
+        elif duration <= 30:
+            style_guide = "Detailed reel - Hook, develop the story, strong call-to-action. Keep momentum throughout."
+        else:
+            style_guide = "Full narrative - Build a complete story arc with beginning, middle, and satisfying end."
 
         prompt = f"""Create a {duration}-second video script narration.
 
@@ -463,6 +495,9 @@ CRITICAL WORD COUNT REQUIREMENT:
 - This is calculated for {WORDS_PER_SECOND} words per second speaking rate
 - Count your words carefully before responding
 
+FORMAT FOR {duration}s VIDEO:
+{style_guide}
+
 STYLE REQUIREMENTS:
 - Tone: {tone}
 - Format: Pure narration only (no "[Scene:]" or stage directions)
@@ -470,7 +505,7 @@ STYLE REQUIREMENTS:
 - Must flow naturally when spoken aloud
 
 OUTPUT: Write ONLY the narration text. No labels, no word count, no explanations.
-Remember: EXACTLY {target_words} words (±{WORD_COUNT_TOLERANCE} words)."""
+Remember: EXACTLY {target_words} words (±{min(3, WORD_COUNT_TOLERANCE)} words for short videos)."""
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -1649,19 +1684,39 @@ class LocalKokoroService:
 
         logging.info(f"[KOKORO] Voice: {voice} ({voice_info.get('name', '')}) - {voice_info.get('style', '')}")
 
-        # PASS 1: Generate TTS naturally
-        logging.info(f"[KOKORO] Pass 1: Generating TTS at natural speed...")
+        # PASS 1: Generate TTS naturally with CHUNK TIMING capture
+        logging.info(f"[KOKORO] Pass 1: Generating TTS at natural speed with timing...")
         pipeline = self._get_pipeline()
 
         audio_parts = []
-        for _, _, audio in pipeline(text, voice=voice, speed=1.0):
+        chunk_timings = []
+        current_sample = 0
+        sample_rate = 24000
+
+        for gs, ps, audio in pipeline(text, voice=voice, speed=1.0):
+            chunk_samples = len(audio)
+            start_time = current_sample / sample_rate
+            end_time = (current_sample + chunk_samples) / sample_rate
+
+            chunk_timings.append({
+                "text": gs.strip(),
+                "start": start_time,
+                "end": end_time
+            })
+
             audio_parts.append(audio)
+            current_sample += chunk_samples
+            logging.debug(f"[KOKORO] Chunk [{start_time:.2f}s - {end_time:.2f}s]: '{gs.strip()}'")
 
         if not audio_parts:
             raise Exception("Kokoro TTS generated no audio")
 
         audio = np.concatenate(audio_parts)
-        sf.write(str(raw_audio_path), audio, 24000)
+        sf.write(str(raw_audio_path), audio, sample_rate)
+
+        # Calculate PROPORTIONAL word-level timing from chunks
+        word_timings = self._calculate_word_timings(chunk_timings)
+        logging.info(f"[KOKORO] Generated {len(word_timings)} word timings from {len(chunk_timings)} chunks")
 
         raw_duration = get_media_duration(raw_audio_path)
         logging.info(f"[KOKORO] Pass 1 complete: {raw_duration:.2f}s")
@@ -1692,35 +1747,94 @@ class LocalKokoroService:
             "target_duration": target_duration,
             "exact_fit_applied": exact_fit_applied,
             "voice": voice,
-            "voice_name": voice_info.get('name', voice)
+            "voice_name": voice_info.get('name', voice),
+            "word_timings": word_timings  # For viral captions with word-by-word highlighting
         }
 
+    def _calculate_word_timings(self, chunk_timings: List[Dict]) -> List[Dict]:
+        """Calculate PROPORTIONAL word-level timing from chunk timings
+
+        Kokoro TTS yields chunks (phrases), not individual words.
+        We distribute each chunk's duration across its words proportionally
+        by character length (longer words = more time).
+
+        Args:
+            chunk_timings: List of {"text": str, "start": float, "end": float}
+
+        Returns:
+            List of {"text": str, "start": float, "end": float} for each word
+        """
+        word_timings = []
+
+        for chunk in chunk_timings:
+            chunk_text = chunk["text"]
+            chunk_start = chunk["start"]
+            chunk_end = chunk["end"]
+            chunk_duration = chunk_end - chunk_start
+
+            # Split chunk into words
+            words = chunk_text.split()
+            if not words:
+                continue
+
+            # Calculate total "weight" (word length as proxy for duration)
+            total_weight = sum(len(w) for w in words)
+            if total_weight == 0:
+                total_weight = len(words)
+
+            # Distribute time proportionally
+            current_time = chunk_start
+            for word in words:
+                word_weight = len(word) / total_weight
+                word_duration = chunk_duration * word_weight
+
+                word_timings.append({
+                    "text": word,
+                    "start": current_time,
+                    "end": current_time + word_duration
+                })
+                current_time += word_duration
+
+        return word_timings
+
     def _exact_fit_audio(self, input_path: Path, output_path: Path, target_seconds: float):
-        """Two-pass exact-fit: time-stretch precisely, pad/trim to exact length"""
+        """Two-pass exact-fit: time-stretch precisely, pad/trim to exact length
+
+        IMPORTANT: Max speed-up is capped at 1.3x to keep voice understandable.
+        If audio is too long, it will be trimmed after gentle speed-up.
+        """
         actual = get_media_duration(input_path)
         if actual <= 0:
             raise RuntimeError(f"Cannot read audio duration from {input_path}")
 
         ratio = actual / float(target_seconds)  # >1 means speed up, <1 means slow down
 
-        logging.info(f"[EXACT-FIT] Source: {actual:.2f}s, Target: {target_seconds}s, Ratio: {ratio:.3f}")
+        # Cap speed-up at 1.3x (30% faster) to keep voice natural and understandable
+        # If audio is much longer, we'll trim the end after gentle speed-up
+        MAX_SPEEDUP_RATIO = 1.3
+        MIN_SLOWDOWN_RATIO = 0.7  # Don't slow down more than 30%
 
-        # Build atempo filter chain (FFmpeg atempo supports 0.5-2.0)
+        original_ratio = ratio
+        if ratio > MAX_SPEEDUP_RATIO:
+            logging.warning(f"[EXACT-FIT] Ratio {ratio:.2f}x exceeds max {MAX_SPEEDUP_RATIO}x - capping speed, will trim")
+            ratio = MAX_SPEEDUP_RATIO
+        elif ratio < MIN_SLOWDOWN_RATIO:
+            logging.warning(f"[EXACT-FIT] Ratio {ratio:.2f}x below min {MIN_SLOWDOWN_RATIO}x - capping speed, will pad")
+            ratio = MIN_SLOWDOWN_RATIO
+
+        logging.info(f"[EXACT-FIT] Source: {actual:.2f}s, Target: {target_seconds}s, "
+                    f"Original ratio: {original_ratio:.3f}, Applied ratio: {ratio:.3f}")
+
+        # Build atempo filter (now limited to reasonable range)
         def atempo_chain(r):
-            chain = []
-            while r > 2.0:
-                chain.append('atempo=2.0')
-                r /= 2.0
-            while r < 0.5:
-                chain.append('atempo=0.5')
-                r /= 0.5
+            # Since we capped ratio, this should always be 0.7-1.3 range
             if abs(r - 1.0) > 1e-6:
-                chain.append(f'atempo={r:.6f}')
-            return ','.join(chain) if chain else 'anull'
+                return f'atempo={r:.6f}'
+            return 'anull'
 
         stretch = atempo_chain(ratio)
 
-        # Filter: stretch + pad + trim for exact duration
+        # Filter: gentle stretch + pad to ensure minimum duration + trim to exact target
         filter_str = f"{stretch},apad=whole_dur={target_seconds},atrim=duration={target_seconds}"
 
         cmd = [
@@ -2346,6 +2460,219 @@ class VideoComposer:
         millis = int((seconds % 1) * 1000)
         return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
 
+    def _format_ass_time(self, seconds: float) -> str:
+        """Format seconds to ASS time format (H:MM:SS.cc)"""
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        cs = int((seconds % 1) * 100)
+        return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+    def _smart_title(self, word: str) -> str:
+        """Title case helper - don't capitalize small words"""
+        small_words = {'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'of', 'in'}
+        w = word.lower().rstrip('.,!?')
+        if w in small_words and len(word) < 4:
+            return word.lower()
+        return word.capitalize()
+
+    def generate_viral_captions(self, word_timings: List[Dict], output_path: Path) -> Path:
+        """Generate VIRAL captions with WORD-BY-WORD highlighting (ASS format)
+
+        Creates TikTok/Reels style captions where each word lights up (yellow)
+        as it's spoken, creating a karaoke effect.
+
+        Args:
+            word_timings: List of {"text": str, "start": float, "end": float}
+            output_path: Path to save the .ass file
+
+        Returns:
+            Path to the generated .ass file
+        """
+        if not word_timings:
+            logging.warning("[CAPTIONS] No word timings provided")
+            return None
+
+        # ASS header - VIRAL STYLE with bigger font, outline, shadow
+        ass_content = """[Script Info]
+Title: Viral Captions
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Main,Arial,72,&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,4,2,40,40,150,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+        # SEMANTIC GROUPING: Use timing gaps + punctuation
+        groups = []
+        current_group = []
+
+        for i, timing in enumerate(word_timings):
+            word = timing["text"].strip()
+            if not word:
+                continue
+            current_group.append(timing)
+
+            is_end_punct = word.endswith(('.', '!', '?'))
+            is_comma = word.endswith(',')
+
+            # Check for timing gap (>0.25s pause = natural break)
+            has_pause = False
+            if i < len(word_timings) - 1:
+                gap = word_timings[i + 1]["start"] - timing["end"]
+                has_pause = gap > 0.25
+
+            # Group break conditions
+            if is_end_punct or has_pause or len(current_group) >= 4 or (len(current_group) >= 3 and is_comma):
+                if current_group:
+                    groups.append(current_group.copy())
+                    current_group = []
+
+        if current_group:
+            groups.append(current_group)
+
+        logging.info(f"[CAPTIONS] Created {len(groups)} semantic phrase groups")
+
+        events = []
+
+        for group in groups:
+            if not group:
+                continue
+
+            # WORD-BY-WORD HIGHLIGHTING
+            # For each word in the group, create an event where THAT word is highlighted
+            for word_idx, current_word_timing in enumerate(group):
+                word_start = current_word_timing["start"]
+                word_end = current_word_timing["end"]
+
+                # Build the line with current word highlighted (yellow)
+                line_parts = []
+                for j, wt in enumerate(group):
+                    word = self._smart_title(wt["text"].strip())
+                    if j == word_idx:
+                        # HIGHLIGHT current word: Yellow color
+                        line_parts.append(f"{{\\c&H00FFFF&}}{word}{{\\c&HFFFFFF&}}")
+                    else:
+                        line_parts.append(word)
+
+                caption_text = " ".join(line_parts)
+                # Clean punctuation spacing
+                caption_text = caption_text.replace(" .", ".").replace(" ,", ",").replace(" !", "!").replace(" ?", "?")
+
+                event = f"Dialogue: 0,{self._format_ass_time(word_start)},{self._format_ass_time(word_end)},Main,,0,0,0,,{caption_text}"
+                events.append(event)
+
+        ass_content += "\n".join(events)
+
+        output_path.write_text(ass_content, encoding='utf-8')
+        logging.info(f"[CAPTIONS] Viral ASS captions saved: {output_path} ({len(events)} dialogue events)")
+
+        return output_path
+
+    def add_viral_captions(self, project_id: str, word_timings: List[Dict],
+                           target_duration: float = None) -> Path:
+        """Add VIRAL word-by-word captions to video with AAC-safe audio
+
+        Args:
+            project_id: Project identifier
+            word_timings: List of {"text": str, "start": float, "end": float}
+            target_duration: If set, enforces exact output duration with AAC-safe audio
+
+        Returns:
+            Path to captioned video
+        """
+        import math
+
+        if not self.is_available():
+            raise Exception("FFmpeg not available for caption addition")
+
+        video_dir = Path(f"outputs/videos/{project_id}")
+        audio_dir = Path(f"outputs/audio/{project_id}")
+
+        # Find final video
+        input_video = video_dir / "final.mp4"
+        if not input_video.exists():
+            raise Exception(f"Final video not found for project {project_id}")
+
+        output_video = video_dir / "captioned.mp4"
+
+        # Generate viral ASS captions
+        ass_path = video_dir / "captions_viral.ass"
+        self.generate_viral_captions(word_timings, ass_path)
+
+        if not ass_path.exists():
+            logging.warning("[CAPTIONS] Failed to generate ASS file, returning original video")
+            return input_video
+
+        # Escape path for FFmpeg ASS filter
+        import platform
+        if platform.system() == 'Windows':
+            ass_escaped = str(ass_path).replace('\\', '/').replace(':', '\\:')
+        else:
+            ass_escaped = str(ass_path)
+
+        # Build FFmpeg command
+        video_duration = get_media_duration(input_video)
+        actual_target = target_duration or video_duration
+
+        # Calculate AAC-safe audio duration (avoid packet padding pushing over target)
+        # AAC uses 1024 samples per frame. Trim to nearest lower boundary.
+        sr = 24000  # Kokoro sample rate (may be resampled but we trim before encode)
+        aac_frame = 1024
+        audio_cap = math.floor(actual_target * sr / aac_frame) * aac_frame / sr
+        logging.info(f"[CAPTIONS] Target: {actual_target:.3f}s, AAC-safe audio: {audio_cap:.4f}s")
+
+        # Video filter: ASS captions
+        vf = f"ass='{ass_escaped}'"
+
+        # Audio filter: AAC-safe trim
+        af = f"atrim=0:{audio_cap},asetpts=PTS-STARTPTS"
+
+        cmd = [
+            FFMPEG_PATH, '-y',
+            '-i', str(input_video),
+            '-filter_complex', f"[0:v]{vf}[v];[0:a]{af}[a]",
+            '-map', '[v]',
+            '-map', '[a]',
+            '-t', str(actual_target),
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-crf', '20',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-movflags', '+faststart',
+            str(output_video)
+        ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300
+            )
+
+            if output_video.exists() and output_video.stat().st_size > 10000:
+                final_duration = get_media_duration(output_video)
+                logging.info(f"[CAPTIONS] Viral captions added: {output_video} ({final_duration:.2f}s)")
+                return output_video
+
+            logging.warning(f"[CAPTIONS] Failed: {result.stderr[:300] if result.stderr else 'No error'}")
+            return input_video
+
+        except subprocess.TimeoutExpired:
+            logging.warning("[CAPTIONS] Timed out, using uncaptioned video")
+            return input_video
+        except Exception as e:
+            logging.warning(f"[CAPTIONS] Error: {e}, using uncaptioned video")
+            return input_video
+
 
 # === PRODUCTION VIDEO COMPOSER (Enhanced) ===
 class ProductionVideoComposer(VideoComposer):
@@ -2581,10 +2908,7 @@ def create_app(config=None):
     # Register error handlers
     register_error_handlers(app)
 
-    # Register routes
-    register_routes(app, limiter)
-
-    # Register Auth Blueprint
+    # Register Auth Blueprint BEFORE routes (so blueprints take priority over catch-all)
     try:
         from auth import auth_bp
         app.register_blueprint(auth_bp)
@@ -2597,7 +2921,7 @@ def create_app(config=None):
         except ImportError as e:
             logger.warning(f"[WARN] Auth blueprint not available: {e}")
 
-    # Register Admin Blueprint
+    # Register Admin Blueprint BEFORE routes
     try:
         from admin_routes import admin_bp
         app.register_blueprint(admin_bp)
@@ -2609,6 +2933,9 @@ def create_app(config=None):
             logger.info("[OK] Admin blueprint registered (/api/v1/admin)")
         except ImportError as e:
             logger.warning(f"[WARN] Admin blueprint not available: {e}")
+
+    # Register routes AFTER blueprints (catch-all route should be last)
+    register_routes(app, limiter)
 
     # Determine which implementations are being used
     tts_type = "OpenAI" if services.get('tts') and isinstance(services['tts'], TTSService) else "Kokoro"
@@ -2967,6 +3294,12 @@ def register_routes(app, limiter):
     @app.route('/<path:filename>')
     def serve_static(filename):
         """Serve static files (HTML, CSS, JS, etc.)"""
+        # IMPORTANT: Skip API paths - let Flask handle them with registered blueprints
+        # This prevents the catch-all route from intercepting /api/v1/auth/login etc.
+        if filename.startswith('api/'):
+            # Return 404 for unmatched API routes (blueprints should have handled these)
+            return jsonify({'status': 'error', 'error': 'API endpoint not found', 'error_code': 'NOT_FOUND'}), 404
+
         # Check if file exists
         file_path = Path(app.static_folder) / filename
         if file_path.exists() and file_path.is_file():
@@ -2982,7 +3315,7 @@ def register_routes(app, limiter):
     @app.route('/api/health', methods=['GET'])  # Legacy support
     @limiter.exempt
     def health_check():
-        """Enhanced health check with service status"""
+        """Enhanced health check with service and database status"""
         services = current_app.config.get('services', {})
 
         service_status = {}
@@ -3005,6 +3338,22 @@ def register_routes(app, limiter):
         service_status['local_kokoro'] = service_status.get('local_kokoro', False)
         service_status['runpod'] = service_status.get('replicate', False)
 
+        # Check database health
+        db_health = {'healthy': False}
+        try:
+            try:
+                from database import check_database_health
+            except ImportError:
+                from backend.database import check_database_health
+            db_health = check_database_health()
+            service_status['database'] = db_health.get('healthy', False)
+            if not db_health.get('healthy', False):
+                all_healthy = False
+        except Exception as e:
+            logger.error(f"Database health check failed: {e}")
+            service_status['database'] = False
+            all_healthy = False
+
         return jsonify(ApiResponse(
             status=ResponseStatus.SUCCESS,
             data={
@@ -3013,6 +3362,7 @@ def register_routes(app, limiter):
                 'version': API_VERSION,
                 'environment': os.getenv('FLASK_ENV', 'production'),
                 'services': service_status,
+                'database': db_health,
                 'uptime': time.time() - app.config.get('start_time', time.time())
             },
             request_id=g.request_id
@@ -3309,6 +3659,7 @@ def register_routes(app, limiter):
 
             # 1. Try Local Kokoro TTS (best quality with exact-fit and automatic voice selection)
             local_kokoro = LocalKokoroService()
+            word_timings = []  # For viral captions
             if local_kokoro.is_available():
                 logger.info("[TTS] Using Local Kokoro TTS with auto voice selection...")
                 try:
@@ -3324,6 +3675,8 @@ def register_routes(app, limiter):
                     exact_fit_applied = result['exact_fit_applied']
                     voice_used = result.get('voice_name', result.get('voice'))
                     speed_adjusted = exact_fit_applied
+                    word_timings = result.get('word_timings', [])  # Capture for viral captions
+                    logger.info(f"[TTS] Captured {len(word_timings)} word timings for viral captions")
                 except Exception as e:
                     logger.warning(f"[TTS] Local Kokoro failed: {e}, trying Edge-TTS...")
 
@@ -3355,7 +3708,7 @@ def register_routes(app, limiter):
                 else:
                     raise Exception("No TTS service available")
 
-            # Update project data
+            # Update project data (including word_timings for viral captions)
             script_path = Path(f"outputs/scripts/{project_id}.json")
             if script_path.exists():
                 project_data = atomic_read_json(script_path)
@@ -3368,6 +3721,7 @@ def register_routes(app, limiter):
                     'targetDuration': target_duration,
                     'speedAdjusted': speed_adjusted,
                     'exactFitApplied': exact_fit_applied,
+                    'wordTimings': word_timings,  # For viral word-by-word captions
                     'generated': datetime.utcnow().isoformat()
                 }
                 atomic_write_json(script_path, project_data)
@@ -4100,11 +4454,30 @@ def register_routes(app, limiter):
 
             logger.info(f"Adding captions to: {project_id}")
 
-            # Add captions
-            video_path = g.service.add_captions(
-                project_id=project_id,
-                script=script
-            )
+            # Check if we have word_timings for viral captions (from Kokoro TTS)
+            word_timings = []
+            target_duration = None
+            script_path = Path(f"outputs/scripts/{project_id}.json")
+            if script_path.exists():
+                project_data = atomic_read_json(script_path)
+                voiceover = project_data.get('voiceover', {})
+                word_timings = voiceover.get('wordTimings', [])
+                target_duration = voiceover.get('targetDuration') or project_data.get('duration')
+
+            # Use viral captions if word_timings available, otherwise fall back to SRT
+            if word_timings:
+                logger.info(f"[CAPTIONS] Using VIRAL word-by-word captions ({len(word_timings)} words)")
+                video_path = g.service.add_viral_captions(
+                    project_id=project_id,
+                    word_timings=word_timings,
+                    target_duration=target_duration
+                )
+            else:
+                logger.info("[CAPTIONS] Using standard SRT captions (no word timings)")
+                video_path = g.service.add_captions(
+                    project_id=project_id,
+                    script=script
+                )
 
             video_url = f"/api/{API_VERSION}/videos/{project_id}/captioned.mp4"
 
@@ -5142,25 +5515,44 @@ def register_routes(app, limiter):
 
     @app.route('/sample_demo.mp4', methods=['GET'])
     def serve_sample_video():
-        """Serve the sample demo video from multiple fallback locations"""
+        """Serve the sample demo video from multiple fallback locations
+
+        Works in all environments:
+        - Local development (Windows/Mac/Linux)
+        - Docker container (Railway, Render, etc.)
+        """
         try:
             # Check multiple possible locations for the sample video
+            # Order matters: most likely locations first
             possible_paths = [
+                # Docker/Railway: /app/sample_demo.mp4 (COPY . . puts it here)
+                Path("/app/sample_demo.mp4"),
+                Path("/app/backend/sample_demo.mp4"),
+                # Local development
                 Path(__file__).parent.parent / "sample_demo.mp4",  # ReelSenseAI/sample_demo.mp4
                 Path(__file__).parent / "sample_demo.mp4",  # backend/sample_demo.mp4
                 Path(__file__).parent.parent / "frontend" / "sample_demo.mp4",  # frontend/sample_demo.mp4
-                Path(__file__).parent.parent.parent / "sample_demo.mp4",  # parent of ReelSenseAI
+                # Fallback
+                Path(__file__).parent.parent.parent / "sample_demo.mp4",
             ]
 
             for video_path in possible_paths:
                 if video_path.exists():
-                    logger.info(f"Serving sample video from: {video_path}")
-                    return send_file(video_path, mimetype='video/mp4')
+                    logger.info(f"[SAMPLE VIDEO] Serving from: {video_path}")
+                    response = send_file(
+                        video_path,
+                        mimetype='video/mp4',
+                        conditional=True  # Support Range requests for seeking
+                    )
+                    # Cache for 1 hour on CDN/browser (sample video doesn't change)
+                    response.headers['Cache-Control'] = 'public, max-age=3600'
+                    return response
 
-            logger.warning(f"Sample video not found in any location. Tried: {[str(p) for p in possible_paths]}")
+            # Log all paths tried for debugging
+            logger.warning(f"[SAMPLE VIDEO] Not found! Tried: {[str(p) for p in possible_paths]}")
             return "Sample video not found", 404
         except Exception as e:
-            logger.error(f"Sample video serve error: {e}")
+            logger.error(f"[SAMPLE VIDEO] Error: {e}")
             return f"Error loading video: {str(e)}", 500
 
     @app.route('/css/<path:filename>', methods=['GET'])
