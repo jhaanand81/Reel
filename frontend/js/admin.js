@@ -492,18 +492,29 @@ function renderVideosGrid(videos) {
                 </tr>
             </thead>
             <tbody>
-                ${videos.map(video => `
-                    <tr>
+                ${videos.map(video => {
+                    // Determine status display (show if deleted/expired)
+                    const isDeleted = video.deleted_at !== null;
+                    const statusText = isDeleted ? 'expired' : video.status;
+                    const statusClass = isDeleted ? 'expired' : video.status;
+
+                    // Use thumbnail URL for preview
+                    const thumbnailUrl = video.thumbnail_url || `/api/v1/videos/${video.id}/thumbnail.jpg`;
+                    const videoUrl = video.video_url || video.output_url;
+
+                    return `
+                    <tr style="${isDeleted ? 'opacity: 0.6;' : ''}">
                         <td>
-                            <div style="width: 80px; height: 45px; background: var(--dark); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--gray);">
-                                ${video.output_url ?
-                                    `<video src="${video.output_url}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 4px;"></video>` :
-                                    '<i class="fas fa-film"></i>'
-                                }
+                            <div style="width: 80px; height: 45px; background: var(--dark); border-radius: 4px; overflow: hidden; position: relative;">
+                                <img src="${thumbnailUrl}"
+                                     style="width: 100%; height: 100%; object-fit: cover;"
+                                     onerror="this.style.display='none'; this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:var(--gray);\\'><i class=\\'fas fa-film\\'></i></div>';"
+                                     alt="Video thumbnail">
+                                ${isDeleted ? '<div style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#ff6b6b;font-size:10px;">EXPIRED</div>' : ''}
                             </div>
                         </td>
                         <td>
-                            <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <div style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${(video.prompt || video.script || 'No prompt').replace(/"/g, '&quot;')}">
                                 ${video.prompt || video.script || 'No prompt'}
                             </div>
                         </td>
@@ -511,23 +522,25 @@ function renderVideosGrid(videos) {
                             <span style="font-size: var(--font-size-sm);">${video.user_email || 'Unknown'}</span>
                         </td>
                         <td>
-                            <span class="status-badge ${video.status}">${video.status}</span>
+                            <span class="status-badge ${statusClass}">${statusText}</span>
                         </td>
                         <td>${formatDate(video.created_at)}</td>
                         <td>
                             <div class="action-btns">
-                                ${video.output_url ? `
-                                    <button class="action-btn view" onclick="window.open('${video.output_url}', '_blank')" title="View Video">
+                                ${videoUrl && !isDeleted ? `
+                                    <button class="action-btn view" onclick="window.open('${videoUrl}', '_blank')" title="View Video">
                                         <i class="fas fa-external-link-alt"></i>
                                     </button>
                                 ` : ''}
-                                <button class="action-btn delete" onclick="openDeleteModal('${video.id}', 'video', 'this video')" title="Delete Video">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                                ${!isDeleted ? `
+                                    <button class="action-btn delete" onclick="openDeleteModal('${video.id}', 'video', 'this video')" title="Delete Video">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                ` : '<span style="color: var(--gray); font-size: 11px;">Deleted</span>'}
                             </div>
                         </td>
                     </tr>
-                `).join('')}
+                `}).join('')}
             </tbody>
         </table>
     `;

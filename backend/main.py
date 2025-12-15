@@ -458,11 +458,13 @@ class GroqService:
 
     def generate_script(self, topic: str, length: str = "medium",
                        tone: str = "witty", duration: int = 30,
-                       brand: str = None) -> Dict[str, Any]:
+                       brand: str = None, regenerate: bool = False) -> Dict[str, Any]:
         """Generate a video script with EXACT word count for target duration
 
         Returns dict with script, word_count, and estimated_duration
         """
+        import random
+
         if not self.is_available():
             raise Exception("Groq API key not configured")
 
@@ -488,7 +490,21 @@ class GroqService:
         else:
             style_guide = "Full narrative - Build a complete story arc with beginning, middle, and satisfying end."
 
-        prompt = f"""Create a {duration}-second video script narration.
+        # Add variety prompt for regeneration to ensure completely different scripts
+        variety_prompts = [
+            "Use a surprising fact or statistic to hook the viewer.",
+            "Start with a bold question that makes viewers think.",
+            "Open with an unexpected perspective on the topic.",
+            "Begin with a relatable scenario the viewer can connect with.",
+            "Lead with the most mind-blowing aspect of the topic.",
+            "Start by challenging a common misconception.",
+            "Open with an emotional hook that resonates.",
+            "Begin with a 'Did you know' style revelation.",
+        ]
+        variety_instruction = random.choice(variety_prompts) if regenerate else ""
+        unique_seed = f"\n[Generate a COMPLETELY DIFFERENT script from any previous versions. {variety_instruction}]" if regenerate else ""
+
+        prompt = f"""Create a {duration}-second video script narration.{unique_seed}
 
 TOPIC: {topic}{brand_context}
 
@@ -514,19 +530,22 @@ Remember: EXACTLY {target_words} words (±{min(3, WORD_COUNT_TOLERANCE)} words f
             "Content-Type": "application/json"
         }
 
+        # Higher temperature for regeneration to ensure different output
+        temperature = 0.9 if regenerate else 0.7
+
         payload = {
             "model": self.model,
             "messages": [
                 {
                     "role": "system",
-                    "content": f"You are an expert video script writer who writes scripts with EXACT word counts. When asked for {target_words} words, you deliver exactly that. You only output the narration text, nothing else."
+                    "content": f"You are an expert video script writer who writes scripts with EXACT word counts. When asked for {target_words} words, you deliver exactly that. You only output the narration text, nothing else. Each script you write is unique and creative."
                 },
                 {
                     "role": "user",
                     "content": prompt
                 }
             ],
-            "temperature": 0.7,
+            "temperature": temperature,
             "max_tokens": 500
         }
 
@@ -781,31 +800,59 @@ class ReplicateService:
             session = get_http_session()
             job_ids = []
 
-            # Start all clips in parallel
-            from concurrent.futures import ThreadPoolExecutor, as_completed
+            # Create scene-aware prompts for each clip (different content per scene)
+            scene_prompts = self._create_scene_prompts(video_prompt, clips_needed)
+            logging.info(f"[REPLICATE] Created {len(scene_prompts)} scene-specific prompts")
+            for i, sp in enumerate(scene_prompts):
+                logging.info(f"[SCENE {i+1}] Prompt: {sp[:80]}...")
 
-            def start_single_clip(clip_index):
-                """Start a single clip generation"""
-                try:
-                    response = session.post(
-                        f"{self.base_url}/predictions",
-                        headers=headers,
-                        json=base_payload,
-                        timeout=60
-                    )
-                    response.raise_for_status()
-                    data = response.json()
-                    job_id = data.get('id')
-                    logging.info(f"[CLIP {clip_index + 1}/{clips_needed}] Started: {job_id}")
-                    return {"index": clip_index, "job_id": job_id, "status": "started"}
-                except Exception as e:
-                    logging.error(f"[CLIP {clip_index + 1}] Failed to start: {e}")
-                    return {"index": clip_index, "job_id": None, "status": "failed", "error": str(e)}
+            # Start all clips in parallel with retry logic
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+            import time as time_module
+
+            max_retries = 2
+            retry_delay = 2  # seconds
+
+            def start_single_clip_with_retry(clip_index):
+                """Start a single clip generation with retry logic"""
+                clip_prompt = scene_prompts[clip_index]
+                clip_payload = {
+                    "version": self.model,
+                    "input": {
+                        "prompt": clip_prompt,  # Scene-specific prompt!
+                        "num_frames": 81,
+                        "resolution": resolution,
+                        "sample_steps": preset["steps"]
+                    }
+                }
+
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = session.post(
+                            f"{self.base_url}/predictions",
+                            headers=headers,
+                            json=clip_payload,
+                            timeout=60
+                        )
+                        response.raise_for_status()
+                        data = response.json()
+                        job_id = data.get('id')
+                        logging.info(f"[CLIP {clip_index + 1}/{clips_needed}] Started successfully: {job_id}")
+                        return {"index": clip_index, "job_id": job_id, "status": "started", "prompt": clip_prompt[:50]}
+                    except Exception as e:
+                        if attempt < max_retries:
+                            logging.warning(f"[CLIP {clip_index + 1}] Failed (attempt {attempt+1}/{max_retries+1}), "
+                                          f"retrying in {retry_delay}s... Error: {e}")
+                            time_module.sleep(retry_delay)
+                        else:
+                            logging.error(f"[CLIP {clip_index + 1}] All retries exhausted: {e}")
+                            return {"index": clip_index, "job_id": None, "status": "failed", "error": str(e)}
+                return {"index": clip_index, "job_id": None, "status": "failed", "error": "Unknown error"}
 
             # Start all clips in parallel using ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=min(clips_needed, 3)) as executor:
                 futures = {
-                    executor.submit(start_single_clip, i): i
+                    executor.submit(start_single_clip_with_retry, i): i
                     for i in range(clips_needed)
                 }
                 results = []
@@ -815,7 +862,16 @@ class ReplicateService:
 
             # Sort by index and collect job_ids
             results.sort(key=lambda x: x['index'])
-            job_ids = [r['job_id'] for r in results if r.get('job_id')]
+            successful_results = [r for r in results if r.get('job_id')]
+            failed_results = [r for r in results if not r.get('job_id')]
+            job_ids = [r['job_id'] for r in successful_results]
+
+            # Log success/failure summary
+            logging.info(f"[REPLICATE] Clip results: {len(successful_results)} succeeded, {len(failed_results)} failed")
+            for r in successful_results:
+                logging.info(f"  [OK] Clip {r['index']+1}: {r['job_id']}")
+            for r in failed_results:
+                logging.error(f"  [FAIL] Clip {r['index']+1}: {r.get('error', 'Unknown')}")
 
             if not job_ids:
                 raise Exception("No video generation jobs started successfully")
@@ -823,21 +879,66 @@ class ReplicateService:
             # Use first job_id as primary, store all in composite
             primary_job_id = job_ids[0]
 
+            # Calculate actual target duration based on successful clips
+            actual_clips = len(job_ids)
+            target_duration = actual_clips * clip_duration
+
             logging.info(f"Video generation started: primary_job={primary_job_id}, "
-                        f"total_jobs={len(job_ids)}, duration={duration}s, clips={clips_needed}")
+                        f"total_jobs={len(job_ids)}/{clips_needed}, duration={target_duration}s (requested={duration}s)")
 
             return {
                 "job_id": primary_job_id,
                 "all_job_ids": job_ids,  # All clip job IDs
-                "clips_needed": clips_needed,
+                "clips_needed": actual_clips,  # Successful clips count
+                "clips_requested": clips_needed,  # Originally requested clips
                 "clip_duration": clip_duration,
-                "target_duration": duration,
+                "target_duration": target_duration,  # Based on successful clips
+                "requested_duration": duration,  # Original request
                 "aspect_ratio": aspect_ratio,
-                "multi_clip": clips_needed > 1
+                "multi_clip": actual_clips > 1,
+                "partial": actual_clips < clips_needed  # Flag if not all clips started
             }
 
         except requests.exceptions.RequestException as e:
             raise Exception(f"Replicate API error: {str(e)}")
+
+    def _create_scene_prompts(self, base_prompt: str, num_clips: int) -> list:
+        """Create scene-specific prompts for multi-clip videos.
+
+        Each clip gets a different scene variation to create visual variety
+        while maintaining the same overall theme.
+        """
+        if num_clips == 1:
+            return [base_prompt]
+
+        # Scene variation prefixes for visual storytelling
+        scene_prefixes = [
+            "Scene 1: opening shot, establishing view, wide angle,",
+            "Scene 2: close-up detail, focused perspective,",
+            "Scene 3: dynamic movement, smooth transition,",
+            "Scene 4: different angle, complementary view,",
+            "Scene 5: dramatic moment, impactful composition,",
+            "Scene 6: atmospheric shot, mood enhancement,",
+        ]
+
+        # Scene variation suffixes for continuity
+        scene_suffixes = [
+            "smooth beginning, gentle introduction",
+            "detailed exploration, engaging visuals",
+            "flowing motion, natural progression",
+            "varied perspective, maintained theme",
+            "climactic feel, strong presence",
+            "concluding atmosphere, cohesive ending",
+        ]
+
+        prompts = []
+        for i in range(num_clips):
+            prefix = scene_prefixes[i % len(scene_prefixes)]
+            suffix = scene_suffixes[i % len(scene_suffixes)]
+            scene_prompt = f"{prefix} {base_prompt}. {suffix}"
+            prompts.append(scene_prompt[:MAX_PROMPT_LENGTH])
+
+        return prompts
 
     def _enhance_prompt(self, prompt: str, reel_type: str, style_tokens: str = None) -> str:
         """Enhance prompt based on reel type and custom style tokens"""
@@ -1910,6 +2011,238 @@ def validate_duration(actual: float, target: float, tolerance: float = 1.0) -> T
         return False, f"Duration MISMATCH: {actual:.1f}s (target: {target}s, diff: {diff:.1f}s)"
 
 
+def generate_thumbnail(video_path: Path, output_path: Path = None, timestamp: float = None) -> Optional[Path]:
+    """
+    Generate a thumbnail image from a video file.
+
+    Args:
+        video_path: Path to the video file
+        output_path: Path for the thumbnail (default: same dir as video, named thumbnail.jpg)
+        timestamp: Time in seconds to extract frame (default: 1 second or middle of video)
+
+    Returns:
+        Path to the thumbnail if successful, None otherwise
+    """
+    try:
+        video_path = Path(video_path)
+        if not video_path.exists():
+            logging.warning(f"[THUMBNAIL] Video not found: {video_path}")
+            return None
+
+        # Default output path
+        if output_path is None:
+            output_path = video_path.parent / "thumbnail.jpg"
+        else:
+            output_path = Path(output_path)
+
+        # Get video duration to pick a good frame
+        duration = get_media_duration(video_path)
+
+        # Default: extract frame from 1 second in, or middle if video is short
+        if timestamp is None:
+            if duration > 2:
+                timestamp = 1.0  # 1 second in (usually a good frame)
+            else:
+                timestamp = duration / 2  # Middle of very short videos
+
+        # Ensure timestamp is within video duration
+        timestamp = min(timestamp, max(0, duration - 0.1))
+
+        # FFmpeg command to extract a single frame as JPEG
+        cmd = [
+            FFMPEG_PATH,
+            '-y',  # Overwrite output
+            '-ss', str(timestamp),  # Seek to timestamp
+            '-i', str(video_path),  # Input video
+            '-vframes', '1',  # Extract 1 frame
+            '-q:v', '2',  # JPEG quality (2 = high quality, smaller number = better)
+            '-vf', 'scale=480:-1',  # Scale to 480px width, maintain aspect ratio
+            str(output_path)
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+
+        if output_path.exists():
+            logging.info(f"[THUMBNAIL] Generated: {output_path} ({output_path.stat().st_size / 1024:.1f}KB)")
+            return output_path
+        else:
+            logging.warning(f"[THUMBNAIL] Failed to generate: {result.stderr}")
+            return None
+
+    except subprocess.TimeoutExpired:
+        logging.warning(f"[THUMBNAIL] Timeout generating thumbnail for {video_path}")
+        return None
+    except Exception as e:
+        logging.warning(f"[THUMBNAIL] Error: {e}")
+        return None
+
+
+def generate_thumbnail_from_url(video_url: str, output_path: Path, timestamp: float = 1.0) -> bool:
+    """
+    Generate a thumbnail from a remote video URL.
+    Uses OpenCV to download and extract a frame.
+
+    Args:
+        video_url: URL of the video (e.g., Replicate delivery URL)
+        output_path: Path to save the thumbnail
+        timestamp: Time in seconds to extract frame (default: 1 second)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import cv2
+        import numpy as np
+        import tempfile
+        import requests
+
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        logging.info(f"[THUMBNAIL] Downloading video from URL: {video_url[:80]}...")
+
+        # Download video to temp file (stream to avoid memory issues)
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tmp_file:
+                temp_path = tmp_file.name
+                response = requests.get(video_url, stream=True, timeout=60)
+                response.raise_for_status()
+
+                # Download in chunks
+                for chunk in response.iter_content(chunk_size=8192):
+                    tmp_file.write(chunk)
+
+            logging.info(f"[THUMBNAIL] Video downloaded to temp file")
+
+            # Open video with OpenCV
+            cap = cv2.VideoCapture(temp_path)
+            if not cap.isOpened():
+                logging.warning(f"[THUMBNAIL] Could not open video from URL")
+                return False
+
+            # Get video properties
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            duration = total_frames / fps if fps > 0 else 5
+
+            # Seek to timestamp
+            target_frame = int(min(timestamp, max(0, duration - 0.1)) * fps)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+
+            ret, frame = cap.read()
+            cap.release()
+
+            if not ret or frame is None:
+                logging.warning(f"[THUMBNAIL] Could not read frame from video")
+                return False
+
+            # Resize to thumbnail width (480px)
+            h, w = frame.shape[:2]
+            new_w = 480
+            new_h = int(h * new_w / w)
+            frame = cv2.resize(frame, (new_w, new_h))
+
+            # Save as JPEG
+            cv2.imwrite(str(output_path), frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+
+            if output_path.exists():
+                logging.info(f"[THUMBNAIL] Generated from URL: {output_path} ({output_path.stat().st_size / 1024:.1f}KB)")
+                return True
+            return False
+
+        finally:
+            # Clean up temp file
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+
+    except ImportError:
+        logging.warning(f"[THUMBNAIL] OpenCV not available for URL thumbnail generation")
+        return False
+    except requests.RequestException as e:
+        logging.warning(f"[THUMBNAIL] Failed to download video: {e}")
+        return False
+    except Exception as e:
+        logging.warning(f"[THUMBNAIL] Error generating thumbnail from URL: {e}")
+        return False
+
+
+def download_video_with_retry(remote_url: str, local_path: Path, max_retries: int = 3) -> bool:
+    """
+    Download a video from a remote URL with retry logic.
+
+    This ensures videos are stored locally for the full retention period,
+    even after Replicate URLs expire (typically a few hours).
+
+    Args:
+        remote_url: URL to download from (e.g., Replicate delivery URL)
+        local_path: Local path to save the video
+        max_retries: Maximum number of retry attempts
+
+    Returns:
+        True if download successful, False otherwise
+    """
+    if not remote_url or not remote_url.startswith('http'):
+        logging.warning(f"[DOWNLOAD] Invalid URL: {remote_url}")
+        return False
+
+    local_path = Path(local_path)
+    local_path.parent.mkdir(parents=True, exist_ok=True)
+
+    for attempt in range(max_retries):
+        try:
+            logging.info(f"[DOWNLOAD] Attempt {attempt + 1}/{max_retries}: {remote_url[:80]}...")
+
+            response = requests.get(remote_url, stream=True, timeout=120)
+            response.raise_for_status()
+
+            # Get content length if available
+            content_length = int(response.headers.get('content-length', 0))
+
+            # Download to temp file first, then rename (atomic)
+            temp_path = local_path.with_suffix('.tmp')
+            downloaded = 0
+
+            with open(temp_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+
+            # Verify download
+            if temp_path.exists() and temp_path.stat().st_size > 0:
+                # Rename to final path
+                temp_path.rename(local_path)
+                file_size_mb = local_path.stat().st_size / (1024 * 1024)
+                logging.info(f"[DOWNLOAD] Success: {local_path} ({file_size_mb:.2f}MB)")
+                return True
+            else:
+                logging.warning(f"[DOWNLOAD] Downloaded file is empty")
+                temp_path.unlink(missing_ok=True)
+
+        except requests.exceptions.Timeout:
+            logging.warning(f"[DOWNLOAD] Timeout on attempt {attempt + 1}")
+        except requests.exceptions.HTTPError as e:
+            logging.warning(f"[DOWNLOAD] HTTP error on attempt {attempt + 1}: {e}")
+            if e.response and e.response.status_code == 404:
+                # URL doesn't exist, no point retrying
+                logging.error(f"[DOWNLOAD] Video URL returns 404 - URL may have expired")
+                return False
+        except Exception as e:
+            logging.warning(f"[DOWNLOAD] Error on attempt {attempt + 1}: {e}")
+
+        # Wait before retry (exponential backoff)
+        if attempt < max_retries - 1:
+            wait_time = (attempt + 1) * 2
+            logging.info(f"[DOWNLOAD] Waiting {wait_time}s before retry...")
+            time.sleep(wait_time)
+
+    logging.error(f"[DOWNLOAD] Failed after {max_retries} attempts")
+    return False
+
+
 def bulletproof_concat(clip_paths: List[str], output_path: str,
                        aspect_ratio: str = "9:16", fps: int = 60) -> bool:
     """
@@ -2214,12 +2547,16 @@ class VideoComposer:
                 is_valid = True
                 msg = f"No target duration specified, final={final_duration:.1f}s"
 
+            # Generate thumbnail for admin preview
+            thumbnail_path = generate_thumbnail(output_path)
+
             return {
                 "output_path": str(output_path),
                 "actual_duration": final_duration,
                 "target_duration": target_duration,
                 "validated": is_valid,
-                "validation_msg": msg
+                "validation_msg": msg,
+                "thumbnail_path": str(thumbnail_path) if thumbnail_path else None
             }
 
         except subprocess.TimeoutExpired:
@@ -3526,7 +3863,7 @@ def register_routes(app, limiter):
     @app.route(f'/api/{API_VERSION}/generate-script', methods=['POST'])
     @app.route('/api/generate-script', methods=['POST'])  # Legacy
     @limiter.limit("20 per minute")
-    @validate_request('topic', length=str, tone=str, duration=int, brand=str)
+    @validate_request('topic', length=str, tone=str, duration=int, brand=str, regenerate=bool)
     @require_service('groq')
     @track_performance
     @idempotent(ttl=900)  # 15 minute TTL for script generation
@@ -3545,7 +3882,10 @@ def register_routes(app, limiter):
             tone = data.get('tone', 'witty')
             duration = min(max(data.get('duration', 30), 5), MAX_VIDEO_DURATION)
 
-            logger.info(f"Generating script: topic={topic[:50]}..., length={length}, tone={tone}, duration={duration}s")
+            # Check if this is a regeneration request
+            regenerate = data.get('regenerate', False)
+
+            logger.info(f"Generating script: topic={topic[:50]}..., length={length}, tone={tone}, duration={duration}s, regenerate={regenerate}")
 
             # Generate script with EXACT word count
             result = g.service.generate_script(
@@ -3553,7 +3893,8 @@ def register_routes(app, limiter):
                 length=length,
                 tone=tone,
                 duration=duration,
-                brand=brand
+                brand=brand,
+                regenerate=regenerate
             )
 
             # Create project with UUID
@@ -3908,16 +4249,32 @@ def register_routes(app, limiter):
             except Exception as db_error:
                 logger.warning(f"[DB] Could not track video job: {db_error}")
 
+            # Check if we got partial clips (some clips failed to start)
+            partial = result.get('partial', False)
+            clips_requested = result.get('clips_requested', clips_needed)
+            target_duration = result.get('target_duration', duration)
+
+            response_data = {
+                'jobId': job_id,
+                'projectId': project_id,
+                'status': VideoStatus.PROCESSING.value,
+                'targetDuration': target_duration,
+                'requestedDuration': duration,
+                'clipsNeeded': clips_needed,
+                'clipsRequested': clips_requested,
+                'clipDuration': clip_duration
+            }
+
+            # Add warning if partial clips
+            if partial:
+                response_data['warning'] = (f"Only {clips_needed}/{clips_requested} clips could be started. "
+                                           f"Video will be {target_duration}s instead of {duration}s.")
+                response_data['partial'] = True
+                logger.warning(f"[VIDEO] Partial clip start: {clips_needed}/{clips_requested} clips")
+
             return jsonify(ApiResponse(
                 status=ResponseStatus.SUCCESS,
-                data={
-                    'jobId': job_id,
-                    'projectId': project_id,
-                    'status': VideoStatus.PROCESSING.value,
-                    'targetDuration': duration,
-                    'clipsNeeded': clips_needed,
-                    'clipDuration': clip_duration
-                },
+                data=response_data,
                 request_id=g.request_id
             ).to_dict()), 202  # 202 Accepted for async operation
 
@@ -4153,25 +4510,16 @@ def register_routes(app, limiter):
                     video_urls = status.get('videoUrls', [])
 
                     if is_multi_clip and video_urls:
-                        # Download all clips
+                        # Download all clips with retry logic
                         logger.info(f"[MULTI-CLIP] Downloading {len(video_urls)} clips...")
                         for i, url in enumerate(video_urls):
                             if url and url.startswith('http'):
-                                try:
-                                    clip_path = video_dir / f"clip_{i}.mp4"
-                                    logger.info(f"[DOWNLOAD] Clip {i+1}/{len(video_urls)}: {url[:60]}...")
-
-                                    video_response = requests.get(url, stream=True, timeout=120)
-                                    video_response.raise_for_status()
-
-                                    with open(clip_path, 'wb') as f:
-                                        for chunk in video_response.iter_content(chunk_size=8192):
-                                            f.write(chunk)
-
+                                clip_path = video_dir / f"clip_{i}.mp4"
+                                if download_video_with_retry(url, clip_path, max_retries=3):
                                     clip_paths.append(str(clip_path))
-                                    logger.info(f"[OK] Clip {i+1} downloaded: {clip_path}")
-                                except Exception as e:
-                                    logger.error(f"Failed to download clip {i}: {e}")
+                                    logger.info(f"[OK] Clip {i+1}/{len(video_urls)} downloaded")
+                                else:
+                                    logger.error(f"[FAIL] Could not download clip {i+1}/{len(video_urls)}")
 
                         # Normalize and concatenate clips into raw.mp4
                         if clip_paths:
@@ -4195,6 +4543,15 @@ def register_routes(app, limiter):
                                     status['localPath'] = str(raw_path)
                                     status['clipPaths'] = clip_paths
                                     logger.info(f"[OK] {len(clip_paths)} clips normalized & concatenated to: {raw_path}")
+
+                                    # Generate thumbnail immediately after concatenation
+                                    try:
+                                        thumbnail_path = video_dir / "thumbnail.jpg"
+                                        if not thumbnail_path.exists():
+                                            generate_thumbnail(raw_path, thumbnail_path)
+                                            logger.info(f"[OK] Thumbnail generated: {thumbnail_path}")
+                                    except Exception as thumb_err:
+                                        logger.warning(f"[THUMBNAIL] Could not generate: {thumb_err}")
                                 else:
                                     logger.error(f"Failed to normalize/concatenate clips")
                             except Exception as e:
@@ -4203,25 +4560,31 @@ def register_routes(app, limiter):
                         # Single clip download (backwards compatible)
                         remote_url = status.get('videoUrl')
                         if remote_url and remote_url.startswith('http'):
-                            try:
-                                local_path = video_dir / "raw.mp4"
-                                logger.info(f"[DOWNLOAD] Downloading video from: {remote_url[:80]}...")
+                            local_path = video_dir / "raw.mp4"
 
-                                video_response = requests.get(remote_url, stream=True, timeout=120)
-                                video_response.raise_for_status()
-
-                                with open(local_path, 'wb') as f:
-                                    for chunk in video_response.iter_content(chunk_size=8192):
-                                        f.write(chunk)
-
+                            # Use robust download with retries - NEVER fall back to remote URL
+                            # Remote URLs expire, so we MUST download locally for 3-day retention
+                            if download_video_with_retry(remote_url, local_path, max_retries=3):
                                 local_video_url = f"/api/{API_VERSION}/videos/{project_id}/raw.mp4"
                                 logger.info(f"[OK] Video downloaded to: {local_path}")
                                 status['videoUrl'] = local_video_url
                                 status['localPath'] = str(local_path)
 
-                            except Exception as e:
-                                logger.error(f"Failed to download video: {e}")
-                                local_video_url = remote_url
+                                # Generate thumbnail immediately after download
+                                try:
+                                    thumbnail_path = video_dir / "thumbnail.jpg"
+                                    if not thumbnail_path.exists():
+                                        generate_thumbnail(local_path, thumbnail_path)
+                                        logger.info(f"[OK] Thumbnail generated: {thumbnail_path}")
+                                except Exception as thumb_err:
+                                    logger.warning(f"[THUMBNAIL] Could not generate: {thumb_err}")
+                            else:
+                                # Download failed - log error but don't use remote URL
+                                # The video will show as unavailable, which is better than
+                                # showing a URL that will expire in hours
+                                logger.error(f"[DOWNLOAD] Failed to download video for {project_id}. "
+                                           f"Video will not be available after Replicate URL expires.")
+                                # Keep local_video_url as None - don't set to remote URL
 
                     # Update project data
                     script_path = Path(f"outputs/scripts/{project_id}.json")
@@ -5384,6 +5747,44 @@ def register_routes(app, limiter):
             video_base = Path('outputs/videos') / project_id
             video_path = safe_path_join(video_base, filename)
 
+            # If video doesn't exist locally, try to download from remote URL in database
+            if not video_path.exists():
+                logger.info(f"[SERVE] Local video not found: {video_path}, checking database for remote URL...")
+                try:
+                    from database import get_db_connection
+                    conn = get_db_connection()
+                    cursor = conn.cursor()
+                    cursor.execute('SELECT video_url FROM video_jobs WHERE id = ?', (project_id,))
+                    row = cursor.fetchone()
+
+                    if row and row[0] and row[0].startswith('http'):
+                        remote_url = row[0]
+                        logger.info(f"[SERVE] Found remote URL in database, attempting download...")
+                        video_base.mkdir(parents=True, exist_ok=True)
+
+                        # Try to download with retries
+                        if download_video_with_retry(remote_url, video_path, max_retries=2):
+                            logger.info(f"[SERVE] Successfully downloaded video to: {video_path}")
+
+                            # Update database with local URL
+                            local_url = f"/api/{API_VERSION}/videos/{project_id}/{filename}"
+                            cursor.execute('UPDATE video_jobs SET video_url = ? WHERE id = ?',
+                                         (local_url, project_id))
+                            conn.commit()
+                            logger.info(f"[SERVE] Updated database with local URL")
+
+                            # Generate thumbnail
+                            try:
+                                thumbnail_path = video_base / "thumbnail.jpg"
+                                if not thumbnail_path.exists():
+                                    generate_thumbnail(video_path, thumbnail_path)
+                            except:
+                                pass
+                        else:
+                            logger.warning(f"[SERVE] Could not download video from remote URL")
+                except Exception as db_err:
+                    logger.warning(f"[SERVE] Database lookup failed: {db_err}")
+
             if not video_path.exists():
                 return jsonify(ApiResponse(
                     status=ResponseStatus.ERROR,
@@ -5483,6 +5884,85 @@ def register_routes(app, limiter):
                 error_code="SERVE_FAILED",
                 request_id=g.request_id
             ).to_dict()), 500
+
+    # === SERVE THUMBNAILS ===
+    @app.route(f'/api/{API_VERSION}/videos/<project_id>/thumbnail.jpg', methods=['GET'])
+    @app.route('/api/videos/<project_id>/thumbnail.jpg', methods=['GET'])  # Legacy
+    def serve_thumbnail(project_id):
+        """Serve video thumbnail image for admin preview"""
+        try:
+            # Validate project ID
+            if not validate_project_id(project_id):
+                return send_placeholder_thumbnail()
+
+            # Use absolute path based on backend directory
+            backend_dir = Path(__file__).parent
+            video_dir = backend_dir / 'outputs' / 'videos' / project_id
+            thumbnail_path = video_dir / 'thumbnail.jpg'
+
+            if thumbnail_path.exists():
+                return send_file(
+                    thumbnail_path,
+                    mimetype='image/jpeg',
+                    max_age=3600
+                )
+
+            # Try to generate thumbnail from local video
+            video_path = video_dir / 'final.mp4'
+            if not video_path.exists():
+                video_path = video_dir / 'captioned.mp4'
+
+            if video_path.exists():
+                # Generate thumbnail on-the-fly
+                logger.info(f"[THUMBNAIL] Generating from local file for {project_id}")
+                generated = generate_thumbnail(video_path, thumbnail_path)
+                if generated and thumbnail_path.exists():
+                    return send_file(
+                        thumbnail_path,
+                        mimetype='image/jpeg',
+                        max_age=3600
+                    )
+
+            # Try to generate thumbnail from remote video URL in database
+            try:
+                from database import get_db_connection
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute('SELECT video_url FROM video_jobs WHERE id = ?', (project_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    video_url = row[0]
+                    if video_url.startswith('http'):
+                        logger.info(f"[THUMBNAIL] Generating from remote URL for {project_id}")
+                        # Create output directory if needed
+                        video_dir.mkdir(parents=True, exist_ok=True)
+                        generated = generate_thumbnail_from_url(video_url, thumbnail_path)
+                        if generated and thumbnail_path.exists():
+                            return send_file(
+                                thumbnail_path,
+                                mimetype='image/jpeg',
+                                max_age=3600
+                            )
+            except Exception as db_err:
+                logger.warning(f"[THUMBNAIL] DB lookup failed for {project_id}: {db_err}")
+
+            # Return placeholder if no video/thumbnail
+            return send_placeholder_thumbnail()
+
+        except Exception as e:
+            logger.warning(f"Thumbnail serve error for {project_id}: {e}")
+            return send_placeholder_thumbnail()
+
+    def send_placeholder_thumbnail():
+        """Return a simple placeholder thumbnail"""
+        # Create a simple gray placeholder (1x1 pixel PNG)
+        placeholder = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\x88\x88\x88\x00\x00\x01+\x00\xf5t\xc4\x7f\x00\x00\x00\x00IEND\xaeB`\x82'
+        from io import BytesIO
+        return send_file(
+            BytesIO(placeholder),
+            mimetype='image/png',
+            max_age=60  # Short cache for placeholder
+        )
 
     # === SERVE FRONTEND ===
     @app.route('/', methods=['GET'])

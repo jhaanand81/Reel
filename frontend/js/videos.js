@@ -229,17 +229,19 @@ function renderVideoCard(video) {
     const expiryInfo = getExpiryInfo(video.expires_at);
     const createdDate = formatDate(video.created_at);
     const videoUrl = video.video_url || '';
+    // Use thumbnail endpoint - this generates thumbnails on-demand if missing
+    const thumbnailUrl = video.thumbnail_url || `/api/v1/videos/${video.id}/thumbnail.jpg`;
 
     return `
         <div class="video-card" data-id="${video.id}">
             <div class="video-thumbnail" onclick="playVideo('${videoUrl}')">
-                ${videoUrl ? `
-                    <video muted preload="metadata">
-                        <source src="${videoUrl}" type="video/mp4">
-                    </video>
-                ` : `
+                <img src="${thumbnailUrl}"
+                     alt="Video thumbnail"
+                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                     style="width: 100%; height: 100%; object-fit: cover;">
+                <div class="thumbnail-fallback" style="display: none; width: 100%; height: 100%; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);">
                     <i class="fas fa-film" style="font-size: 3rem; color: rgba(255,255,255,0.5);"></i>
-                `}
+                </div>
                 <div class="play-overlay">
                     <i class="fas fa-play-circle"></i>
                 </div>

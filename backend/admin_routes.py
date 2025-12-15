@@ -24,6 +24,7 @@ try:
         update_user_role,
         delete_user,
         get_all_videos,
+        get_all_videos_admin,
         delete_video,
         get_user_jobs,
         # Analytics
@@ -70,6 +71,7 @@ except ImportError:
             update_user_role,
             delete_user,
             get_all_videos,
+            get_all_videos_admin,
             delete_video,
             get_user_jobs,
             # Analytics
@@ -417,10 +419,20 @@ def get_user_credit_history(user_id):
 @admin_bp.route('/videos', methods=['GET'])
 @require_admin
 def list_videos():
-    """Get all videos"""
+    """Get all videos for admin (including deleted ones for audit)"""
     try:
         limit = request.args.get('limit', 100, type=int)
-        videos = get_all_videos(limit=limit)
+        include_deleted = request.args.get('include_deleted', 'true').lower() == 'true'
+
+        # Use admin version that includes deleted videos and user info
+        videos = get_all_videos_admin(limit=limit, include_deleted=include_deleted)
+
+        # Add thumbnail URLs for each video
+        for video in videos:
+            video_id = video.get('id')
+            if video_id:
+                # Thumbnail URL - will be served by thumbnail endpoint
+                video['thumbnail_url'] = f"/api/v1/videos/{video_id}/thumbnail.jpg"
 
         return jsonify({
             'status': 'success',

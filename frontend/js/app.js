@@ -1401,6 +1401,12 @@ class UIController {
         const loadingMsg = regenerate ? 'Regenerating script with fresh ideas...' : 'Generating script with AI...';
         this.showLoading(loadingMsg);
 
+        // Show generating message in textarea while loading
+        if (this.elements.scriptPreview) {
+            this.elements.scriptPreview.value = 'Generating your script... Please wait...';
+            this.elements.scriptPreview.disabled = true;
+        }
+
         try {
             const response = await this.api.generateScript({
                 topic,
@@ -1411,7 +1417,7 @@ class UIController {
                 regenerate: regenerate
             });
 
-            if (response.status === 'success' && response.data) {
+            if (response.status === 'success' && response.data && response.data.script) {
                 this.state.updateProject({
                     script: response.data.script,
                     projectId: response.data.projectId
@@ -1419,18 +1425,27 @@ class UIController {
 
                 if (this.elements.scriptPreview) {
                     this.elements.scriptPreview.value = response.data.script;
+                    this.elements.scriptPreview.disabled = false;
                 }
 
                 this.showNotification('Script generated successfully!', 'success');
             } else {
-                throw new Error(response.error || 'Failed to generate script');
+                throw new Error(response.error || 'Failed to generate script - no script returned');
             }
         } catch (error) {
             console.error('Script generation error:', error);
+            // Show error in textarea
+            if (this.elements.scriptPreview) {
+                this.elements.scriptPreview.value = 'Script generation failed. Click "Regenerate Script" to try again, or enter your own script here.';
+                this.elements.scriptPreview.disabled = false;
+            }
             this.handleError(error, 'Failed to generate script');
         } finally {
             this.state.setState({ isGenerating: false });
             this.hideLoading();
+            if (this.elements.scriptPreview) {
+                this.elements.scriptPreview.disabled = false;
+            }
         }
     }
 
@@ -1438,9 +1453,10 @@ class UIController {
      * Regenerate script
      */
     async regenerateScript() {
+        // Clear old script
         this.state.updateProject({ script: '' });
         if (this.elements.scriptPreview) {
-            this.elements.scriptPreview.value = '';
+            this.elements.scriptPreview.value = 'Regenerating script with fresh ideas...';
         }
         await this.generateScript(true);  // Pass true for regenerate flag
     }
@@ -1661,6 +1677,16 @@ class UIController {
 
             if (videoResponse.status !== 'success') {
                 throw new Error('Video generation failed');
+            }
+
+            // Check for partial clip warning
+            if (videoResponse.data.partial || videoResponse.data.warning) {
+                console.warn('[VIDEO] Partial generation:', videoResponse.data.warning);
+                // Show warning to user
+                const warningMsg = videoResponse.data.warning ||
+                    `Only ${videoResponse.data.clipsNeeded}/${videoResponse.data.clipsRequested} clips started. ` +
+                    `Video will be ${videoResponse.data.targetDuration}s instead of ${videoResponse.data.requestedDuration}s.`;
+                this.showNotification(warningMsg, 'warning');
             }
 
             this.state.updateProject({ jobId: videoResponse.data.jobId });

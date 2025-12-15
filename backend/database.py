@@ -23,9 +23,18 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
-# Database path - Railway volume should be mounted at /app/backend/data
-DB_PATH = Path(os.getenv('DATABASE_PATH', 'data/reelsense.db'))
+# Database path - Railway volume MUST be mounted at /app/backend/data
+# Use ABSOLUTE path based on this file's location for 100% reliability
+_BACKEND_DIR = Path(__file__).parent.resolve()
+_DEFAULT_DB_PATH = _BACKEND_DIR / 'data' / 'reelsense.db'
+DB_PATH = Path(os.getenv('DATABASE_PATH', str(_DEFAULT_DB_PATH)))
 API_KEY_PREFIX = 'rsk_'
+
+# Log database path on module load for debugging
+print(f"[DATABASE] Path configured: {DB_PATH}")
+print(f"[DATABASE] Backend dir: {_BACKEND_DIR}")
+print(f"[DATABASE] Path exists: {DB_PATH.exists()}")
+print(f"[DATABASE] Parent exists: {DB_PATH.parent.exists()}")
 
 # Thread-local storage for connections
 _local = threading.local()
@@ -597,6 +606,45 @@ def soft_delete_video(video_id: str, user_id: str) -> bool:
         ''', (video_id, user_id))
         return cursor.rowcount > 0
 
+def get_all_videos_admin(limit: int = 100, include_deleted: bool = True) -> List[Dict]:
+    """Get all videos for admin dashboard (includes deleted videos)"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        if include_deleted:
+            # Admin sees ALL videos including deleted (for audit/tracking)
+            cursor.execute('''
+                SELECT v.id, v.user_id, v.provider, v.status, v.prompt, v.duration,
+                       v.video_url, v.thumbnail_url, v.file_path, v.file_size,
+                       v.created_at, v.completed_at, v.expires_at, v.deleted_at, v.error,
+                       u.email as user_email, u.name as user_name
+                FROM video_jobs v
+                LEFT JOIN users u ON v.user_id = u.id
+                ORDER BY v.created_at DESC
+                LIMIT ?
+            ''', (limit,))
+        else:
+            cursor.execute('''
+                SELECT v.id, v.user_id, v.provider, v.status, v.prompt, v.duration,
+                       v.video_url, v.thumbnail_url, v.file_path, v.file_size,
+                       v.created_at, v.completed_at, v.expires_at, v.deleted_at, v.error,
+                       u.email as user_email, u.name as user_name
+                FROM video_jobs v
+                LEFT JOIN users u ON v.user_id = u.id
+                WHERE v.deleted_at IS NULL
+                ORDER BY v.created_at DESC
+                LIMIT ?
+            ''', (limit,))
+        return [dict(row) for row in cursor.fetchall()]
+
+def update_video_thumbnail(video_id: str, thumbnail_url: str) -> bool:
+    """Update thumbnail URL for a video"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE video_jobs SET thumbnail_url = ? WHERE id = ?
+        ''', (thumbnail_url, video_id))
+        return cursor.rowcount > 0
+
 def get_video_job_info(job_id: str) -> Optional[Dict]:
     """Get video job info by ID"""
     with get_db() as conn:
@@ -620,10 +668,38 @@ def set_video_expiry(job_id: str, retention_days: int = 3):
         ''', (retention_days, job_id))
 
 def cleanup_expired_videos() -> int:
-    """Delete expired videos and return count of deleted"""
+    """Delete expired videos (soft delete in DB + delete actual files) and return count"""
+    import shutil
+    from pathlib import Path
+
     with get_db() as conn:
         cursor = conn.cursor()
-        # Soft delete expired videos
+
+        # First, get the list of expired videos to delete their files
+        cursor.execute('''
+            SELECT id, video_url, file_path FROM video_jobs
+            WHERE expires_at IS NOT NULL
+              AND expires_at < datetime('now')
+              AND deleted_at IS NULL
+        ''')
+        expired_videos = cursor.fetchall()
+
+        # Delete actual video files (but keep thumbnail for admin reference)
+        for video in expired_videos:
+            video_id = video['id'] if isinstance(video, dict) else video[0]
+            try:
+                # Video directory path
+                video_dir = Path(__file__).parent / 'outputs' / 'videos' / video_id
+                if video_dir.exists():
+                    # Delete video files but keep thumbnail.jpg for admin
+                    for file in video_dir.iterdir():
+                        if file.name != 'thumbnail.jpg':
+                            file.unlink(missing_ok=True)
+                    logger.info(f"[CLEANUP] Deleted video files for {video_id}")
+            except Exception as e:
+                logger.warning(f"[CLEANUP] Failed to delete files for {video_id}: {e}")
+
+        # Soft delete in database (keeps record for admin dashboard)
         cursor.execute('''
             UPDATE video_jobs
             SET deleted_at = datetime('now')

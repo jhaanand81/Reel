@@ -85,7 +85,12 @@ class ReplicateService(VideoProviderBase):
         return prompts
 
     def _start_single_clip(self, prompt: str, clip_index: int, resolution: str = None) -> Dict[str, Any]:
-        """Start generation for a single clip"""
+        """Start generation for a single clip
+
+        Makes API call to Replicate to start video generation.
+        Returns dict with clip_index, job_id, status, and prompt.
+        On failure, job_id will be None and error will contain the error message.
+        """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -96,6 +101,7 @@ class ReplicateService(VideoProviderBase):
         # Get the correct WAN 2.2 model for this resolution
         model = self._get_model_for_resolution(res)
         logger.info(f"[CLIP {clip_index+1}] Using model: {model}, resolution: {res}")
+        logger.info(f"[CLIP {clip_index+1}] Prompt: {prompt[:80]}...")
 
         # Resolution dimensions (9:16 vertical for reels)
         resolution_map = {
@@ -119,16 +125,58 @@ class ReplicateService(VideoProviderBase):
             url = f"{self.base_url}/models/{model}/predictions"
             logger.info(f"[CLIP {clip_index+1}] POST {url}")
             r = requests.post(url, headers=headers, json=payload, timeout=60)
+
+            # Log response status for debugging
+            logger.info(f"[CLIP {clip_index+1}] Response status: {r.status_code}")
+
+            if r.status_code != 201 and r.status_code != 200:
+                error_text = r.text[:200] if r.text else "No response body"
+                logger.error(f"[CLIP {clip_index+1}] API error: {r.status_code} - {error_text}")
+                return {
+                    "clip_index": clip_index,
+                    "job_id": None,
+                    "status": "failed",
+                    "error": f"API returned {r.status_code}: {error_text}"
+                }
+
             r.raise_for_status()
             data = r.json()
+            job_id = data.get('id')
+
+            if not job_id:
+                logger.error(f"[CLIP {clip_index+1}] No job ID in response: {data}")
+                return {
+                    "clip_index": clip_index,
+                    "job_id": None,
+                    "status": "failed",
+                    "error": "No job ID in API response"
+                }
+
+            logger.info(f"[CLIP {clip_index+1}] Job created: {job_id}")
             return {
                 "clip_index": clip_index,
-                "job_id": data.get('id'),
+                "job_id": job_id,
                 "status": "starting",
                 "prompt": prompt[:100]
             }
+        except requests.exceptions.Timeout:
+            logger.error(f"[CLIP {clip_index+1}] Request timeout (60s)")
+            return {
+                "clip_index": clip_index,
+                "job_id": None,
+                "status": "failed",
+                "error": "Request timeout - Replicate API took too long to respond"
+            }
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"[CLIP {clip_index+1}] Connection error: {e}")
+            return {
+                "clip_index": clip_index,
+                "job_id": None,
+                "status": "failed",
+                "error": f"Connection error: {str(e)}"
+            }
         except Exception as e:
-            logger.error(f"Failed to start clip {clip_index}: {e}")
+            logger.error(f"[CLIP {clip_index+1}] Failed to start: {e}")
             return {
                 "clip_index": clip_index,
                 "job_id": None,
@@ -137,7 +185,13 @@ class ReplicateService(VideoProviderBase):
             }
 
     def generate_video(self, prompt, duration=5, **kwargs):
-        """Generate video - starts multiple clips in parallel for longer durations"""
+        """Generate video - starts multiple clips in parallel for longer durations
+
+        For durations > 5s, generates multiple 5-second clips and stores them for later concatenation.
+        Each clip gets a unique scene variation prompt for visual diversity.
+
+        Includes retry logic: if any clip fails to start, retries up to 2 times with delay.
+        """
         clip_duration = self.max_single_clip_duration
         clips_needed = max(1, (duration + clip_duration - 1) // clip_duration)
 
@@ -155,48 +209,99 @@ class ReplicateService(VideoProviderBase):
         # Create unique prompts for each clip
         scene_prompts = self._create_scene_prompts(prompt, clips_needed)
 
-        # Start all clips in parallel
-        clip_jobs = []
-        with ThreadPoolExecutor(max_workers=min(clips_needed, 3)) as executor:
-            futures = {
-                executor.submit(self._start_single_clip, scene_prompts[i], i, resolution): i
-                for i in range(clips_needed)
-            }
-            for future in as_completed(futures):
-                result = future.result()
-                clip_jobs.append(result)
-                logger.info(f"[CLIP {result['clip_index']+1}/{clips_needed}] Job started: {result.get('job_id', 'FAILED')}")
+        # Log all scene prompts for debugging
+        for i, sp in enumerate(scene_prompts):
+            logger.info(f"[SCENE {i+1}] Prompt: {sp[:100]}...")
 
-        # Sort by clip index
+        # Start all clips with retry logic
+        clip_jobs = []
+        max_retries = 2
+        retry_delay = 2  # seconds
+
+        def start_clip_with_retry(clip_index):
+            """Start a single clip with retry logic"""
+            for attempt in range(max_retries + 1):
+                result = self._start_single_clip(scene_prompts[clip_index], clip_index, resolution)
+                if result.get('job_id'):
+                    logger.info(f"[CLIP {clip_index+1}/{clips_needed}] Started successfully: {result['job_id']}")
+                    return result
+                elif attempt < max_retries:
+                    # Rate limit error (429) - wait longer before retry
+                    wait_time = retry_delay * (attempt + 1) * 2  # Exponential backoff: 4s, 8s, etc.
+                    logger.warning(f"[CLIP {clip_index+1}] Failed (attempt {attempt+1}/{max_retries+1}), "
+                                 f"retrying in {wait_time}s... Error: {result.get('error', 'Unknown')}")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"[CLIP {clip_index+1}] Failed after {max_retries+1} attempts: {result.get('error', 'Unknown')}")
+            return result
+
+        # Start clips SEQUENTIALLY to avoid rate limiting (Replicate limits to 1 burst when < $5 credit)
+        # Wait 12 seconds between clips to stay under 6 requests/minute limit
+        logger.info(f"[MULTI-CLIP] Starting clips sequentially (rate limit workaround)")
+        for i in range(clips_needed):
+            if i > 0:
+                # Wait 12 seconds between clips to avoid rate limiting
+                wait_between = 12
+                logger.info(f"[CLIP {i+1}] Waiting {wait_between}s before starting (rate limit protection)")
+                time.sleep(wait_between)
+
+            result = start_clip_with_retry(i)
+            clip_jobs.append(result)
+
+        # Sort by clip index to maintain order
         clip_jobs.sort(key=lambda x: x['clip_index'])
 
-        # Create master job ID (use first clip's job ID as primary)
-        primary_job_id = clip_jobs[0]['job_id'] if clip_jobs[0]['job_id'] else f"multi_{int(time.time())}"
+        # Check how many clips started successfully
+        successful_clips = [c for c in clip_jobs if c.get('job_id')]
+        failed_clips = [c for c in clip_jobs if not c.get('job_id')]
 
-        # Store multi-clip job info
+        if failed_clips:
+            logger.error(f"[MULTI-CLIP] {len(failed_clips)}/{clips_needed} clips failed to start!")
+            for fc in failed_clips:
+                logger.error(f"  - Clip {fc['clip_index']+1} failed: {fc.get('error', 'Unknown error')}")
+
+        # If ALL clips failed, raise an error
+        if not successful_clips:
+            raise Exception(f"All {clips_needed} clips failed to start. Check Replicate API token and rate limits.")
+
+        # If some clips failed, log warning but continue with what we have
+        if len(successful_clips) < clips_needed:
+            logger.warning(f"[MULTI-CLIP] Only {len(successful_clips)}/{clips_needed} clips started. "
+                          f"Video will be {len(successful_clips) * clip_duration}s instead of {duration}s")
+
+        # Create master job ID (use first successful clip's job ID as primary)
+        primary_job_id = successful_clips[0]['job_id']
+
+        # Store multi-clip job info (only successful clips)
         _multi_clip_jobs[primary_job_id] = {
-            "clip_jobs": clip_jobs,
-            "clips_needed": clips_needed,
+            "clip_jobs": successful_clips,  # Only store successful clips
+            "clips_needed": len(successful_clips),  # Actual clips we have
+            "clips_requested": clips_needed,  # Original request
             "clip_duration": clip_duration,
-            "target_duration": duration,
+            "target_duration": len(successful_clips) * clip_duration,  # Actual duration we'll get
+            "requested_duration": duration,  # Original request
             "base_prompt": prompt,
-            "created_at": time.time()
+            "created_at": time.time(),
+            "failed_clips": len(failed_clips)
         }
 
-        # Collect all job IDs
-        all_job_ids = [c['job_id'] for c in clip_jobs if c['job_id']]
-        logger.info(f"[MULTI-CLIP] Started {len(all_job_ids)} clips: {all_job_ids}")
+        # Collect all successful job IDs
+        all_job_ids = [c['job_id'] for c in successful_clips]
+        logger.info(f"[MULTI-CLIP] Started {len(all_job_ids)}/{clips_needed} clips: {all_job_ids}")
 
         return {
             "job_id": primary_job_id,
             "provider": "replicate",
             "status": "starting",
-            "clips_needed": clips_needed,
+            "clips_needed": len(successful_clips),  # Actual clips
+            "clips_requested": clips_needed,  # Original request
             "clip_duration": clip_duration,
-            "target_duration": duration,
+            "target_duration": len(successful_clips) * clip_duration,
+            "requested_duration": duration,
             "clip_jobs": all_job_ids,
             "all_job_ids": all_job_ids,  # Required by main.py
-            "multi_clip": clips_needed > 1
+            "multi_clip": len(successful_clips) > 1,
+            "partial": len(successful_clips) < clips_needed  # Flag if we couldn't start all clips
         }
 
     def generate_video_from_image(self, image_url: str, prompt: str = "", duration: int = 5, **kwargs) -> Dict[str, Any]:
