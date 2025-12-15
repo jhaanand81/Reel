@@ -194,8 +194,10 @@ FFMPEG_POOL = None
 # ========================================================================
 
 # Speaking rate for script generation (words per second)
-WORDS_PER_SECOND = 2.5
-WORD_COUNT_TOLERANCE = 5  # Allow ±5 words
+# 2.0 wps = slower, more natural conversational pace
+# 2.5 wps = fast-paced, energetic (can sound rushed)
+WORDS_PER_SECOND = 2.0
+WORD_COUNT_TOLERANCE = 4  # Allow ±4 words
 
 # Video generation settings
 MAX_VIDEO_DURATION = 60  # Maximum video duration in seconds
@@ -401,12 +403,12 @@ def calculate_word_count(duration: int, length: str = None) -> Tuple[int, int, i
 
     Returns: (target_words, min_words, max_words)
 
-    Duration-based word counts (at 2.5 words/second):
-    - 5s  → ~12 words (short punchy hook)
-    - 10s → ~25 words (quick message)
-    - 15s → ~38 words (standard reel)
-    - 30s → ~75 words (detailed reel)
-    - 60s → ~150 words (full story)
+    Duration-based word counts (at 2.0 words/second for natural pace):
+    - 5s  → ~10 words (short punchy hook)
+    - 10s → ~20 words (quick message)
+    - 15s → ~30 words (standard reel)
+    - 30s → ~60 words (detailed reel)
+    - 60s → ~120 words (full story)
     """
     # For short-form videos (5-30s), ALWAYS use duration-based calculation
     # This ensures voiceover fits the exact target duration
@@ -422,9 +424,9 @@ def calculate_word_count(duration: int, length: str = None) -> Tuple[int, int, i
     # For longer videos, use length presets if provided
     if length:
         length_word_counts = {
-            'short': (75, 60, 90),       # Short: ~30s video
-            'medium': (150, 125, 175),   # Medium: ~60s video
-            'long': (225, 200, 250),     # Long: ~90s video
+            'short': (60, 50, 75),       # Short: ~30s video at 2.0 wps
+            'medium': (120, 100, 140),   # Medium: ~60s video at 2.0 wps
+            'long': (180, 160, 200),     # Long: ~90s video at 2.0 wps
         }
         if length.lower() in length_word_counts:
             return length_word_counts[length.lower()]
@@ -1809,10 +1811,10 @@ class LocalKokoroService:
 
         ratio = actual / float(target_seconds)  # >1 means speed up, <1 means slow down
 
-        # Cap speed-up at 1.3x (30% faster) to keep voice natural and understandable
-        # If audio is much longer, we'll trim the end after gentle speed-up
-        MAX_SPEEDUP_RATIO = 1.3
-        MIN_SLOWDOWN_RATIO = 0.7  # Don't slow down more than 30%
+        # Cap speed-up at 1.15x (15% faster) to keep voice natural and understandable
+        # Higher speeds make voice sound rushed and unnatural
+        MAX_SPEEDUP_RATIO = 1.15
+        MIN_SLOWDOWN_RATIO = 0.85  # Don't slow down more than 15%
 
         original_ratio = ratio
         if ratio > MAX_SPEEDUP_RATIO:
@@ -3900,8 +3902,9 @@ def register_routes(app, limiter):
                         pass
 
                 if user_id:
-                    create_video_job(job_id, user_id, g.service.__class__.__name__, script[:500], duration)
-                    logger.info(f"[DB] Video job tracked for user {user_id}")
+                    # Use project_id (not job_id) for consistent tracking across all routes
+                    create_video_job(project_id, user_id, g.service.__class__.__name__, script[:500], duration)
+                    logger.info(f"[DB] Video job tracked for user {user_id}, project={project_id}")
             except Exception as db_error:
                 logger.warning(f"[DB] Could not track video job: {db_error}")
 
@@ -4249,14 +4252,15 @@ def register_routes(app, limiter):
                                                             calculate_video_credits, deduct_credits, get_video_job_info)
 
                             video_url = local_video_url or status.get('videoUrl')
-                            update_video_job(job_id, 'completed', video_url)
+                            # Use project_id for database operations (matches create_video_job)
+                            update_video_job(project_id, 'completed', video_url)
                             retention_days = get_retention_setting()
-                            set_video_expiry(job_id, retention_days)
-                            logger.info(f"[DB] Video job {job_id} marked completed, expires in {retention_days} days")
+                            set_video_expiry(project_id, retention_days)
+                            logger.info(f"[DB] Video job {project_id} marked completed, expires in {retention_days} days")
 
                             # Deduct credits on successful completion
                             try:
-                                job_info = get_video_job_info(job_id)
+                                job_info = get_video_job_info(project_id)
                                 if job_info and job_info.get('user_id'):
                                     video_duration = job_info.get('duration', 5)
                                     credits_to_deduct = calculate_video_credits(video_duration)
@@ -5277,9 +5281,17 @@ def register_routes(app, limiter):
                     request_id=g.request_id
                 ).to_dict()), 400
 
-            # Try local file first
+            # Try local file first - prefer captioned version over final
             video_base = Path('outputs/videos') / project_id
+
+            # Check for captioned video first (user added captions)
+            captioned_path = safe_path_join(video_base, f'captioned.{format}')
             video_path = safe_path_join(video_base, f'final.{format}')
+
+            # Use captioned version if it exists, otherwise use final
+            if captioned_path.exists():
+                video_path = captioned_path
+                logger.info(f"[DOWNLOAD] Using captioned video: {video_path}")
 
             if video_path.exists():
                 logger.info(f"Downloading local video: {video_path}")
